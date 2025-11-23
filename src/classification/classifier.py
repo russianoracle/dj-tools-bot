@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 import numpy as np
 
 from ..audio.extractors import AudioFeatures

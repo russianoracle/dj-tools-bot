@@ -1,7 +1,7 @@
 """Read classification results from audio file metadata."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from mutagen import File
 
 from ..classification.classifier import EnergyZone

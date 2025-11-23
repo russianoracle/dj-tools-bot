@@ -2,7 +2,7 @@
 
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from mutagen import File
 from mutagen.id3 import ID3, COMM, TXXX, TIT1
 from mutagen.mp4 import MP4

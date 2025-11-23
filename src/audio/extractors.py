@@ -2,6 +2,7 @@
 
 import librosa
 import numpy as np
+from scipy.ndimage import uniform_filter1d
 from typing import Dict, Any, Tuple
 from dataclasses import dataclass, asdict
 
@@ -134,28 +135,121 @@ class FeatureExtractor:
         return features
 
     def _extract_tempo(self, y: np.ndarray, sr: int) -> Tuple[float, float]:
-        """Extract tempo (BPM) and confidence."""
+        """
+        Extract tempo (BPM) using multiple methods and select the best result.
+
+        Uses:
+        1. Onset-based tempo detection (most accurate for electronic music)
+        2. Beat tracking method
+        3. Tempogram aggregation
+
+        Returns the result with highest confidence.
+        """
+        results = []
+
+        # Method 1: Onset-based tempo (best for electronic/dance music)
         try:
-            tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
+            onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+            tempo_onset = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=None)
 
-            # Convert to scalar if array
-            if isinstance(tempo, np.ndarray):
-                tempo = float(tempo[0]) if len(tempo) > 0 else 120.0
+            # Get the dominant tempo
+            if len(tempo_onset) > 0:
+                # Use histogram to find most common tempo
+                hist, bins = np.histogram(tempo_onset, bins=50, range=(60, 200))
+                dominant_idx = np.argmax(hist)
+                tempo_val = (bins[dominant_idx] + bins[dominant_idx + 1]) / 2
 
-            # Estimate confidence based on beat strength
-            if len(beats) > 1:
+                # Confidence based on how much the dominant tempo appears
+                confidence = hist[dominant_idx] / len(tempo_onset)
+                results.append(('onset', tempo_val, confidence))
+                logger.debug(f"Onset method: {tempo_val:.1f} BPM (conf: {confidence:.2f})")
+        except Exception as e:
+            logger.debug(f"Onset tempo failed: {e}")
+
+        # Method 2: Beat tracking with percussive separation
+        try:
+            # Separate harmonic and percussive
+            y_harmonic, y_percussive = librosa.effects.hpss(y)
+
+            # Beat track on percussive component
+            tempo_beat, beats = librosa.beat.beat_track(y=y_percussive, sr=sr)
+
+            if isinstance(tempo_beat, np.ndarray):
+                tempo_beat = float(tempo_beat[0]) if len(tempo_beat) > 0 else 120.0
+
+            # Calculate confidence from beat consistency
+            if len(beats) > 2:
                 beat_times = librosa.frames_to_time(beats, sr=sr)
                 beat_intervals = np.diff(beat_times)
-                # Lower variance = higher confidence
-                confidence = 1.0 / (1.0 + np.std(beat_intervals))
-            else:
-                confidence = 0.5
 
-            logger.debug(f"Tempo: {tempo:.1f} BPM (confidence: {confidence:.2f})")
-            return float(tempo), float(confidence)
-
+                # Check consistency of beat intervals
+                if len(beat_intervals) > 0:
+                    mean_interval = np.mean(beat_intervals)
+                    std_interval = np.std(beat_intervals)
+                    # Higher consistency = higher confidence
+                    consistency = 1.0 - min(std_interval / mean_interval, 1.0)
+                    confidence = max(consistency, 0.3)
+                    results.append(('beat_track', float(tempo_beat), confidence))
+                    logger.debug(f"Beat track method: {tempo_beat:.1f} BPM (conf: {confidence:.2f})")
         except Exception as e:
-            logger.warning(f"Tempo extraction failed: {e}, using default")
+            logger.debug(f"Beat tracking failed: {e}")
+
+        # Method 3: Autocorrelation of onset strength
+        try:
+            onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+            # Compute autocorrelation
+            ac = librosa.autocorrelate(onset_env)
+
+            # Find peaks in autocorrelation (correspond to tempo)
+            # Limit search to reasonable BPM range (60-200)
+            min_lag = int(sr / 200 * 512 / sr)  # 200 BPM
+            max_lag = int(sr / 60 * 512 / sr)   # 60 BPM
+
+            if max_lag < len(ac):
+                ac_range = ac[min_lag:max_lag]
+                if len(ac_range) > 0:
+                    peak_idx = np.argmax(ac_range) + min_lag
+                    tempo_ac = 60 * sr / (peak_idx * 512 / sr)
+
+                    # Confidence from peak strength
+                    confidence = min(ac_range[np.argmax(ac_range)] / np.max(ac), 1.0)
+                    results.append(('autocorr', tempo_ac, confidence))
+                    logger.debug(f"Autocorr method: {tempo_ac:.1f} BPM (conf: {confidence:.2f})")
+        except Exception as e:
+            logger.debug(f"Autocorrelation tempo failed: {e}")
+
+        # Select best result
+        if results:
+            # Sort by confidence
+            results.sort(key=lambda x: x[2], reverse=True)
+            best_method, tempo, confidence = results[0]
+
+            # Sanity check: tempo should be in reasonable range
+            if tempo < 60:
+                tempo = tempo * 2  # Double it
+            elif tempo > 200:
+                tempo = tempo / 2  # Halve it
+
+            # Final confidence boost if multiple methods agree
+            if len(results) >= 2:
+                other_tempos = [r[1] for r in results[1:]]
+                # Check if other methods are within 5 BPM or octave-related
+                agreements = 0
+                for other_tempo in other_tempos:
+                    if abs(tempo - other_tempo) < 5:
+                        agreements += 1
+                    elif abs(tempo - other_tempo * 2) < 5:
+                        agreements += 0.5
+                    elif abs(tempo * 2 - other_tempo) < 5:
+                        agreements += 0.5
+
+                if agreements > 0:
+                    confidence = min(confidence * (1 + agreements * 0.2), 1.0)
+
+            logger.debug(f"Best tempo: {tempo:.1f} BPM via {best_method} (final conf: {confidence:.2f})")
+            return float(tempo), float(confidence)
+        else:
+            logger.warning("All tempo extraction methods failed, using default")
             return 120.0, 0.0
 
     def _extract_zero_crossing_rate(self, y: np.ndarray) -> float:
@@ -264,7 +358,7 @@ class FeatureExtractor:
         rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
 
         # Smooth energy curve
-        rms_smooth = librosa.util.smooth(rms, window_len=11)
+        rms_smooth = uniform_filter1d(rms, size=11)
 
         # Compute energy derivative (changes)
         energy_diff = np.diff(rms_smooth)
