@@ -80,29 +80,27 @@ class RuleBasedClassifier:
         count = 0
 
         # BPM criteria (lower is better for yellow)
-        if features.tempo < self.yellow_max_bpm:
-            score += 1.0 - (features.tempo / self.yellow_max_bpm)
-            count += 1
-        else:
-            # Penalty for high BPM
-            score += max(0, 1.0 - ((features.tempo - self.yellow_max_bpm) / 50))
-            count += 1
+        # Smooth scoring function: highest score at low BPM, decreasing as tempo increases
+        # score = 1.0 - (tempo / (yellow_max + penalty_range))
+        # This ensures continuous scoring across the threshold
+        penalty_range = 50.0
+        max_tempo = self.yellow_max_bpm + penalty_range
+        score += max(0, 1.0 - (features.tempo / max_tempo))
+        count += 1
 
         # Energy variance (lower is better)
-        if features.energy_variance < self.yellow_max_energy_var:
-            score += 1.0 - (features.energy_variance / self.yellow_max_energy_var)
-            count += 1
-        else:
-            score += max(0, 1.0 - (features.energy_variance / 0.3))
-            count += 1
+        # Continuous scoring function
+        variance_penalty_range = 0.15  # Additional range for penalty
+        max_variance = self.yellow_max_energy_var + variance_penalty_range
+        score += max(0, 1.0 - (features.energy_variance / max_variance))
+        count += 1
 
         # Brightness (lower is better)
-        if features.brightness < self.yellow_max_brightness:
-            score += 1.0 - (features.brightness / self.yellow_max_brightness)
-            count += 1
-        else:
-            score += max(0, 1.0 - features.brightness)
-            count += 1
+        # Continuous scoring function (brightness is 0.0-1.0 normalized)
+        brightness_penalty_range = 0.3
+        max_brightness = min(1.0, self.yellow_max_brightness + brightness_penalty_range)
+        score += max(0, 1.0 - (features.brightness / max_brightness))
+        count += 1
 
         # Drop intensity (should be low)
         score += 1.0 - min(1.0, features.drop_intensity / self.drop_intensity_threshold)
@@ -176,21 +174,26 @@ class RuleBasedClassifier:
         count = 0
 
         # BPM criteria (higher is better for purple)
-        if features.tempo > self.purple_min_bpm:
+        # More strict: require BPM > purple_min for good scores
+        if features.tempo >= self.purple_min_bpm:
             # Bonus for very high BPM
             score += min(1.0, (features.tempo - self.purple_min_bpm) / 40 + 0.7)
             count += 1
         else:
-            # Penalty for low BPM
-            score += max(0, features.tempo / self.purple_min_bpm)
+            # Moderate penalty for low BPM
+            bpm_ratio = features.tempo / self.purple_min_bpm
+            score += max(0, bpm_ratio * 0.7)  # Balanced penalty
             count += 1
 
         # Energy variance (higher is better)
-        if features.energy_variance > self.purple_min_energy_var:
+        # More strict: require variance > purple_min for good scores
+        if features.energy_variance >= self.purple_min_energy_var:
             score += min(1.0, features.energy_variance / 0.6)
             count += 1
         else:
-            score += max(0, features.energy_variance / self.purple_min_energy_var)
+            # Moderate penalty for low variance
+            var_ratio = features.energy_variance / self.purple_min_energy_var
+            score += max(0, var_ratio * 0.8)  # Balanced penalty
             count += 1
 
         # Spectral centroid (higher is better)
@@ -198,7 +201,7 @@ class RuleBasedClassifier:
             score += min(1.0, features.spectral_centroid / 3000)
             count += 1
         else:
-            score += max(0, features.spectral_centroid / self.purple_min_spectral_centroid)
+            score += max(0, features.spectral_centroid / self.purple_min_spectral_centroid * 0.7)
             count += 1
 
         # Drop intensity (higher is better)
@@ -206,7 +209,7 @@ class RuleBasedClassifier:
             score += min(1.0, features.drop_intensity / 0.8 + 0.3)
             count += 1
         else:
-            score += features.drop_intensity / self.drop_intensity_threshold
+            score += features.drop_intensity / self.drop_intensity_threshold * 0.8
             count += 1
 
         # Brightness (higher is better for energetic tracks)

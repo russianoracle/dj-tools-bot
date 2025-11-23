@@ -14,6 +14,7 @@ from ..audio import AudioLoader, FeatureExtractor
 from ..classification import EnergyZoneClassifier, EnergyZone
 from ..metadata import MetadataWriter, MetadataReader
 from ..utils import get_logger
+from .training_window import TrainingWindow
 
 logger = get_logger(__name__)
 
@@ -93,6 +94,16 @@ class MainWindow(QMainWindow):
         """Set up user interface."""
         self.setWindowTitle("Mood Classifier - DJ Track Energy Zone Analyzer")
         self.setGeometry(100, 100, 1200, 800)
+
+        # Menu bar
+        menu_bar = self.menuBar()
+
+        # Training menu
+        training_menu = menu_bar.addMenu("&Training")
+
+        train_action = QAction("Train Zone Classifier...", self)
+        train_action.triggered.connect(self.open_training_window)
+        training_menu.addAction(train_action)
 
         # Central widget
         central_widget = QWidget()
@@ -460,3 +471,8 @@ class MainWindow(QMainWindow):
             details += f"  Drop Intensity: {features.drop_intensity:.2f}\n"
 
             QMessageBox.information(self, "Track Details", details)
+
+    def open_training_window(self):
+        """Open zone classifier training window."""
+        training_window = TrainingWindow(self)
+        training_window.exec_()

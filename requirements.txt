@@ -9,6 +9,11 @@ scipy>=1.10.0
 
 # Machine Learning
 scikit-learn>=1.3.0
+xgboost>=2.0.0
+tensorflow>=2.13.0  # For neural network zone classification
+torch>=2.0.0
+torchaudio>=2.0.0
+pandas>=2.0.0
 
 # Metadata Handling
 mutagen>=1.47.0
@@ -20,6 +25,10 @@ pyqtgraph>=0.13.0
 # Utilities
 pyyaml>=6.0
 tqdm>=4.65.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
 
 # Testing
 pytest>=7.4.0

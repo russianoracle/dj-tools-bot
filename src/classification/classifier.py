@@ -78,6 +78,8 @@ class EnergyZoneClassifier:
         self.config = config
         self.rule_classifier = RuleBasedClassifier(config)
         self.ml_model = None
+        self.ml_scaler = None
+        self.ml_feature_columns = None
 
         if model_path:
             self._load_model(model_path)
@@ -128,16 +130,36 @@ class EnergyZoneClassifier:
             return EnergyZone.UNCERTAIN, 0.0
 
         try:
-            # Convert features to vector
-            X = features.to_vector().reshape(1, -1)
+            # Convert features to vector and extract only columns used by model
+            feature_dict = features.to_dict()
+
+            # Build feature vector in correct order
+            if self.ml_feature_columns:
+                X = np.array([feature_dict[col] for col in self.ml_feature_columns]).reshape(1, -1)
+            else:
+                X = features.to_vector().reshape(1, -1)
+
+            # Scale features if scaler is available
+            if self.ml_scaler is not None:
+                X = self.ml_scaler.transform(X)
 
             # Predict
             prediction = self.ml_model.predict(X)[0]
             probabilities = self.ml_model.predict_proba(X)[0]
 
-            # Map prediction to zone
-            zone_map = {0: EnergyZone.YELLOW, 1: EnergyZone.GREEN, 2: EnergyZone.PURPLE}
-            zone = zone_map.get(prediction, EnergyZone.UNCERTAIN)
+            # Map string prediction to zone
+            if isinstance(prediction, str):
+                zone_map = {
+                    'yellow': EnergyZone.YELLOW,
+                    'green': EnergyZone.GREEN,
+                    'purple': EnergyZone.PURPLE
+                }
+                zone = zone_map.get(prediction.lower(), EnergyZone.UNCERTAIN)
+            else:
+                # Numeric prediction (0, 1, 2)
+                zone_map = {0: EnergyZone.YELLOW, 1: EnergyZone.GREEN, 2: EnergyZone.PURPLE}
+                zone = zone_map.get(prediction, EnergyZone.UNCERTAIN)
+
             confidence = float(np.max(probabilities))
 
             return zone, confidence
@@ -151,11 +173,24 @@ class EnergyZoneClassifier:
         try:
             import pickle
             with open(model_path, 'rb') as f:
-                self.ml_model = pickle.load(f)
-            logger.info(f"Loaded ML model from {model_path}")
+                model_data = pickle.load(f)
+
+            # Handle both old format (just model) and new format (dict)
+            if isinstance(model_data, dict):
+                self.ml_model = model_data.get('model')
+                self.ml_scaler = model_data.get('scaler')
+                self.ml_feature_columns = model_data.get('feature_columns')
+                logger.info(f"Loaded ML model from {model_path} (algorithm: {model_data.get('algorithm')})")
+            else:
+                # Old format - just the model
+                self.ml_model = model_data
+                logger.info(f"Loaded ML model from {model_path} (legacy format)")
+
         except Exception as e:
             logger.warning(f"Failed to load ML model: {e}")
             self.ml_model = None
+            self.ml_scaler = None
+            self.ml_feature_columns = None
 
     def save_model(self, model_path: str):
         """Save trained ML model."""

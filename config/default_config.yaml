@@ -48,7 +48,7 @@ classification:
   drop_intensity_threshold: 0.6  # For purple zone identification
 
   # Confidence thresholds
-  min_confidence: 0.6  # Below this, flag as "uncertain"
+  min_confidence: 0.55  # Below this, flag as "uncertain"
 
 # Metadata Settings
 metadata:
