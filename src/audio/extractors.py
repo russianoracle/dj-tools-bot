@@ -220,34 +220,85 @@ class FeatureExtractor:
 
         # Select best result
         if results:
-            # Sort by confidence
-            results.sort(key=lambda x: x[2], reverse=True)
-            best_method, tempo, confidence = results[0]
+            # Collect all tempo candidates (including octaves)
+            all_candidates = []
+            for method, tempo, conf in results:
+                all_candidates.append((tempo, conf, method, 'original'))
+                all_candidates.append((tempo * 2, conf * 0.8, method, '2x'))
+                all_candidates.append((tempo / 2, conf * 0.8, method, '0.5x'))
 
-            # Sanity check: tempo should be in reasonable range
-            if tempo < 60:
-                tempo = tempo * 2  # Double it
-            elif tempo > 200:
-                tempo = tempo / 2  # Halve it
+            # Score each candidate based on:
+            # 1. Original confidence
+            # 2. How well it fits typical BPM ranges for electronic music
+            # 3. Agreement with other methods
 
-            # Final confidence boost if multiple methods agree
-            if len(results) >= 2:
-                other_tempos = [r[1] for r in results[1:]]
-                # Check if other methods are within 5 BPM or octave-related
+            scored_candidates = []
+            for tempo, conf, method, octave in all_candidates:
+                # Skip unreasonable tempos
+                if tempo < 50 or tempo > 210:
+                    continue
+
+                score = conf
+
+                # Prefer typical electronic music BPM ranges
+                # Tech House/Techno: 120-135, House: 118-130, Dubstep: 130-145
+                if 115 <= tempo <= 145:
+                    score *= 1.3  # Strong preference
+                elif 90 <= tempo <= 115 or 145 <= tempo <= 165:
+                    score *= 1.1  # Moderate preference
+                elif tempo < 80 or tempo > 175:
+                    score *= 0.7  # Penalize unusual tempos
+
+                # Check agreement with other candidates
                 agreements = 0
-                for other_tempo in other_tempos:
-                    if abs(tempo - other_tempo) < 5:
+                for other_tempo, _, _, _ in all_candidates:
+                    if other_tempo != tempo and abs(tempo - other_tempo) < 3:
                         agreements += 1
-                    elif abs(tempo - other_tempo * 2) < 5:
-                        agreements += 0.5
-                    elif abs(tempo * 2 - other_tempo) < 5:
-                        agreements += 0.5
 
                 if agreements > 0:
-                    confidence = min(confidence * (1 + agreements * 0.2), 1.0)
+                    score *= (1 + agreements * 0.1)
 
-            logger.debug(f"Best tempo: {tempo:.1f} BPM via {best_method} (final conf: {confidence:.2f})")
-            return float(tempo), float(confidence)
+                scored_candidates.append((tempo, score, conf, method, octave))
+
+            if not scored_candidates:
+                logger.warning("No valid tempo candidates, using default")
+                return 120.0, 0.0
+
+            # Select best scored candidate
+            scored_candidates.sort(key=lambda x: x[1], reverse=True)
+            best_tempo, best_score, original_conf, best_method, octave_used = scored_candidates[0]
+
+            # Calculate honest confidence based on:
+            # - Agreement between top candidates
+            # - Consistency of original methods
+            # - Whether octave correction was needed
+
+            top_candidates = scored_candidates[:3]
+            if len(top_candidates) >= 2:
+                # Check if top candidates agree (within 3 BPM)
+                top_tempos = [c[0] for c in top_candidates]
+                std_dev = np.std(top_tempos)
+
+                if std_dev < 3:
+                    agreement_factor = 1.0
+                elif std_dev < 5:
+                    agreement_factor = 0.85
+                else:
+                    agreement_factor = 0.7
+            else:
+                agreement_factor = 0.8
+
+            # Penalize confidence if octave correction was used
+            if octave_used != 'original':
+                octave_penalty = 0.85
+            else:
+                octave_penalty = 1.0
+
+            # Final honest confidence
+            final_confidence = min(original_conf * agreement_factor * octave_penalty, 0.95)
+
+            logger.debug(f"Best tempo: {best_tempo:.1f} BPM via {best_method} ({octave_used}) (conf: {final_confidence:.2f})")
+            return float(best_tempo), float(final_confidence)
         else:
             logger.warning("All tempo extraction methods failed, using default")
             return 120.0, 0.0
