@@ -1,0 +1,102 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Application specific
+# Cache directory
+.mood-classifier/
+
+# Log files
+*.log
+
+# Trained models (comment out if you want to commit them)
+models/*.pkl
+models/*.joblib
+
+# User configuration overrides
+config/user_config.yaml
+config/local_config.yaml
+
+# Backup files created by metadata writer
+*.backup
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Test fixtures (large audio files)
+tests/fixtures/*.mp3
+tests/fixtures/*.wav
+tests/fixtures/*.flac
+tests/fixtures/*.m4a
+# Keep a README in fixtures
+!tests/fixtures/README.md
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# IDE
+*.swp
+*.swo
+*~

@@ -1,0 +1,117 @@
+# Mood Classifier Default Configuration
+
+# Audio Processing Settings
+audio:
+  sample_rate: 22050  # Hz - balance between quality and speed
+  duration: null      # null = process entire file
+  offset: 0.0         # Start offset in seconds
+
+# Feature Extraction Settings
+features:
+  # Tempo settings
+  tempo:
+    min_bpm: 60
+    max_bpm: 200
+
+  # MFCC settings
+  mfcc:
+    n_mfcc: 5  # Number of MFCC coefficients (as per specification)
+    n_fft: 2048
+    hop_length: 512
+
+  # Spectral settings
+  spectral:
+    n_fft: 2048
+    hop_length: 512
+    brightness_threshold: 3000  # Hz - frequency above which is "bright"
+
+  # Energy settings
+  energy:
+    frame_length: 2048
+    hop_length: 512
+
+# Classification Thresholds
+classification:
+  # BPM thresholds
+  yellow_max_bpm: 110
+  purple_min_bpm: 128
+
+  # Energy variance thresholds (will be calibrated during training)
+  yellow_max_energy_variance: 0.15
+  purple_min_energy_variance: 0.40
+
+  # Spectral thresholds
+  yellow_max_brightness: 0.20
+  purple_min_spectral_centroid: 2000  # Hz
+
+  # Drop detection
+  drop_intensity_threshold: 0.6  # For purple zone identification
+
+  # Confidence thresholds
+  min_confidence: 0.6  # Below this, flag as "uncertain"
+
+# Metadata Settings
+metadata:
+  # Fields to write classification results
+  use_comment_field: true
+  use_grouping_field: true
+  use_genre_field: false  # Don't overwrite user's genre
+  custom_field_name: "ENERGYZONE"
+
+  # Backup original metadata
+  create_backup: true
+  backup_suffix: ".backup"
+
+# Performance Settings
+performance:
+  # Multiprocessing
+  use_multiprocessing: true
+  max_workers: null  # null = CPU count - 1
+
+  # Caching
+  enable_cache: true
+  cache_dir: "~/.mood-classifier/cache"
+  cache_expiry_days: 30
+
+# GUI Settings
+gui:
+  window_width: 1200
+  window_height: 800
+  theme: "dark"  # dark or light
+
+  # Visualization
+  show_waveform: true
+  show_spectrogram: false  # Performance impact
+
+# Zones Configuration
+zones:
+  yellow:
+    name: "Yellow (Rest)"
+    color: "#FFD700"
+    emoji: "🟨"
+    description: "Low-energy, calm tracks for rest periods"
+
+  green:
+    name: "Green (Transition)"
+    color: "#00FF00"
+    emoji: "🟩"
+    description: "Medium-energy transitional tracks"
+
+  purple:
+    name: "Purple (Energy)"
+    color: "#9370DB"
+    emoji: "🟪"
+    description: "High-energy tracks with drops"
+
+# Export Settings
+export:
+  csv_delimiter: ","
+  include_all_features: true
+  playlist_format: "m3u8"  # m3u8, pls, or xspf
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_file: "~/.mood-classifier/app.log"
+  max_log_size_mb: 10
+  backup_count: 3
