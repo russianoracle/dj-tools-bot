@@ -10,6 +10,7 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import logging
+import sys
 
 from src.training.zone_features import ZoneFeatures
 
@@ -52,7 +53,8 @@ class DEAMLoader:
         dfs = []
         for ann_file in ann_files:
             if ann_file.exists():
-                df = pd.read_csv(ann_file)
+                # skipinitialspace=True to handle spaces after commas in CSV
+                df = pd.read_csv(ann_file, skipinitialspace=True)
                 dfs.append(df)
                 logger.info(f"Loaded {len(df)} annotations from {ann_file.name}")
             else:

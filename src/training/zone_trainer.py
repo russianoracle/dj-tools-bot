@@ -26,7 +26,8 @@ logger = get_logger(__name__)
 class ZoneTrainer:
     """Coordinates zone classification training pipeline."""
 
-    def __init__(self, test_data_path: str, use_gpu: bool = True, use_embeddings: bool = False, use_fast_mode: bool = True):
+    def __init__(self, test_data_path: str, use_gpu: bool = True, use_embeddings: bool = False,
+                 use_music_emotion: bool = False, use_fast_mode: bool = False):
         """
         Initialize zone trainer.
 
@@ -34,11 +35,14 @@ class ZoneTrainer:
             test_data_path: Path to TSV file with zone labels
             use_gpu: Use GPU for feature extraction
             use_embeddings: Use deep learning embeddings (wav2vec2) - SLOW but more accurate
-            use_fast_mode: Use fast feature extraction (10 features vs 30+) - 10x faster, good accuracy
+            use_music_emotion: Extract arousal/valence using music emotion model - VERY SLOW (~15 sec/track)
+            use_fast_mode: Use fast feature extraction (10 features vs 51 DJ-specific features)
+                          Default False to use full feature set with DJ-specific features
         """
         self.test_data_path = Path(test_data_path)
         self.use_gpu = use_gpu
         self.use_embeddings = use_embeddings
+        self.use_music_emotion = use_music_emotion
         self.use_fast_mode = use_fast_mode
         self._should_stop = False  # Graceful stop flag
 
@@ -47,8 +51,12 @@ class ZoneTrainer:
             self.feature_extractor = FastZoneFeatureExtractor()
             logger.info("Using FAST feature extraction (10 features, ~3s/track)")
         else:
-            self.feature_extractor = ZoneFeatureExtractor(use_gpu=use_gpu, use_embeddings=use_embeddings)
-            logger.info("Using FULL feature extraction (30+ features, ~30s/track)")
+            self.feature_extractor = ZoneFeatureExtractor(
+                use_gpu=use_gpu,
+                use_embeddings=use_embeddings,
+                use_music_emotion=use_music_emotion
+            )
+            logger.info("Using FULL feature extraction (51 DJ-specific features, ~30s/track)")
 
         # Data storage
         self.audio_paths = []
@@ -248,7 +256,9 @@ class ZoneTrainer:
             'features_list': self.features_list
         })
 
+        # Always save features cache for faster re-runs
         if checkpoint_manager:
+            self._log(log_callback, "INFO", f"💾 Saving features cache to {checkpoint_manager.checkpoint_dir}/features.pkl")
             checkpoint_manager.save_checkpoint(
                 model=None,
                 epoch=0,
@@ -256,6 +266,7 @@ class ZoneTrainer:
                 algorithm='features',
                 features_df=features_df
             )
+            self._log(log_callback, "INFO", f"✓ Features cache saved successfully")
 
         return features_df
 
@@ -490,10 +501,11 @@ class ZoneTrainer:
         save_dir = Path(save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        # Setup checkpoints
-        checkpoint_manager = None
-        if checkpoint_dir:
-            checkpoint_manager = CheckpointManager(checkpoint_dir)
+        # Setup checkpoints - ALWAYS create checkpoint manager for feature caching
+        if checkpoint_dir is None:
+            # Use default checkpoint directory for feature caching
+            checkpoint_dir = 'models/checkpoints'
+        checkpoint_manager = CheckpointManager(checkpoint_dir)
 
         results = {}
 

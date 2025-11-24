@@ -90,6 +90,9 @@ tests/fixtures/*.m4a
 # Keep a README in fixtures
 !tests/fixtures/README.md
 
+# DEAM dataset (large, should not be in git)
+dataset/
+
 # Temporary files
 *.tmp
 *.temp

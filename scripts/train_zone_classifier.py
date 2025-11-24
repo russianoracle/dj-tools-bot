@@ -105,6 +105,12 @@ Examples:
     )
 
     parser.add_argument(
+        '--use-music-emotion',
+        action='store_true',
+        help='Extract arousal/valence using music emotion model (VERY slow: ~15 sec/track)'
+    )
+
+    parser.add_argument(
         '--no-gpu',
         action='store_true',
         help='Disable GPU acceleration (use CPU only)'
@@ -143,6 +149,7 @@ Examples:
     print(f"Algorithms: {', '.join(args.algorithms)}")
     print(f"Output directory: {args.output}")
     print(f"Use embeddings: {not args.no_embeddings}")
+    print(f"Use music emotion: {args.use_music_emotion}")
     print(f"Use GPU: {not args.no_gpu}")
     if args.checkpoint_dir:
         print(f"Checkpoint directory: {args.checkpoint_dir}")
@@ -153,7 +160,8 @@ Examples:
         # Initialize trainer
         trainer = ZoneTrainer(
             test_data_path=str(data_path),
-            use_gpu=not args.no_gpu
+            use_gpu=not args.no_gpu,
+            use_music_emotion=args.use_music_emotion
         )
 
         # Setup checkpoint manager

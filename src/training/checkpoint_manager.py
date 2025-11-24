@@ -63,11 +63,16 @@ class CheckpointManager:
         # Update training history
         self._update_history(algorithm, epoch, metrics)
 
-        # Save features (only once, they're large)
-        if features_df is not None and not (self.checkpoint_dir / "features.pkl").exists():
+        # Save features - ALWAYS overwrite to keep cache up-to-date
+        if features_df is not None:
             features_path = self.checkpoint_dir / "features.pkl"
+            # Remove old cache if exists
+            if features_path.exists():
+                features_path.unlink()
+                logger.info(f"Removed old features cache: {features_path}")
+            # Save new cache
             features_df.to_pickle(str(features_path))
-            logger.info(f"Saved features to {features_path}")
+            logger.info(f"Saved features cache to {features_path}")
 
         logger.info(f"Checkpoint saved: {checkpoint_name}")
 
