@@ -13,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 
 from .zone_trainer import ZoneTrainer, ZONE_LABELS
 from .zone_features import ZoneFeatures
+from .checkpoint_manager import CheckpointManager
 from ..utils import get_logger
 
 logger = get_logger(__name__)
@@ -39,6 +40,9 @@ class DEAMZoneTrainer(ZoneTrainer):
         # Не вызываем super().__init__() так как не нужен test_data_path
         self.deam_dir = Path(deam_dir)
         self.use_gpu = False  # Фичи уже извлечены
+
+        # Checkpoint manager для совместимости с базовым ZoneTrainer
+        self.checkpoint_manager = CheckpointManager(checkpoint_dir="models/checkpoints")
         self.use_embeddings = False
         self.use_music_emotion = False
         self.use_fast_mode = False
@@ -146,9 +150,9 @@ class DEAMZoneTrainer(ZoneTrainer):
         X_test = test_df[feature_columns].values
 
         # Конвертируем зоны в числовые метки
-        y_train = train_df['zone'].map(ZONE_LABELS).values
-        y_val = val_df['zone'].map(ZONE_LABELS).values
-        y_test = test_df['zone'].map(ZONE_LABELS).values
+        y_train = train_df['zone'].str.lower().map(ZONE_LABELS).values
+        y_val = val_df['zone'].str.lower().map(ZONE_LABELS).values
+        y_test = test_df['zone'].str.lower().map(ZONE_LABELS).values
 
         # Нормализуем фичи
         self._log(log_callback, "INFO", "📏 Normalizing features...")

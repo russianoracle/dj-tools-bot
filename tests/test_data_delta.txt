@@ -1,0 +1,106 @@
+# Delta: New and Changed Tracks
+# Compared: tests/test_data.txt vs tests/test_data_2.txt
+# New tracks: 69
+# Changed zones: 11
+
+## NEW TRACKS
+
+### YELLOW (10 tracks)
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Locky-Supa-Smoov-U27LYH.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Max-Dean-Can-t-Decide--Extended--CJ4KI7.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Paranoid-London-Talk-Dirty-AZ6R67.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/9-Vitali--Looking-Forward-VTRFQN.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/Sidney Charles/5-Sidney-Charles-Im-Your-X23IEF.flac
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/1-Rodriguez-Jr--Roads-HCCDC0.flac
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/Nina kraviz set/03_Jeff Mills-The Bells_BPM_137-Am-Minimal Te.flac
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/Pan-Pot - Mobilee Back to Back Vol.6 Presented by Pan-Pot [2012] (FLAC)/09_And․ID-Dirty Thirty_BPM_125-4A-Minimal te.flac
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/Pan-Pot - Mobilee Back to Back Vol.6 Presented by Pan-Pot [2012] (FLAC)/14_Pan-Pot-Threesixty_BPM_129-9B-Minimal te.flac
+/Users/artemgusarov/Music/DJ Library/new year 2025/06_Highrise-View From Up Here_BPM_124-5A-Electro.flac
+
+### GREEN (17 tracks)
+/Users/artemgusarov/Music/DJ Library/House/1-James-View-Licky-Licky-P6J6JB.mp3
+/Users/artemgusarov/Music/DJ Library/MNML/01_First Beige-Searching_BPM_130-5A-Jazz.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-DJANGO--NL--That-Shit-Funky-06PR0C.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Hidde-van-Wee-Aspire-to-Inspire-H6RJF5.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Jimi-Latifi-Slinky-SMZUH4.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Max-Dean-The-Finest-XNGYTS.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Michael-Bibi-Shaolin-Dreams-S7YREI.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1_Amine_Edge_Licky_Licky_Amine_Edge_DANCE_s_Codeine_Juke_Ed_.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/2-Gigsta-Get-That-Remix-K9OXQG.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/2-Magnetic-Revival-This-Is-The-Groove-EFVSKK.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/Cloonee - How deep are you dream.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/SOSA UK/1-Sosa-UK-Bring-It-Back-BCKW64.flac
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/Pan-Pot - Mobilee Back to Back Vol.6 Presented by Pan-Pot [2012] (FLAC)/18_Pan-Potfeat․ Cari Golden-Captain My Captain_BPM_126-5A-Minimal te.flac
+/Users/artemgusarov/Music/DJ Library/mix/09_Mac Declos-Sacred Geometry_BPM_148-3A.flac
+/Users/artemgusarov/Music/DJ Library/new year 2025/01_Akami, Campanini-Don't Stop Me_BPM_126-6A.flac
+/Users/artemgusarov/Music/DJ Library/new year 2025/01_NIF-Pump Up the Jam_BPM_128-5A.flac
+/Users/artemgusarov/Music/DJ Library/new year 2025/01_Sandro Puddu-Love Me Again_BPM_126-6A.flac
+
+### PURPLE (42 tracks)
+/Users/artemgusarov/Music/DJ Library/FUNK HOUSE/01_Dashel-Just 4 U-7A.flac
+/Users/artemgusarov/Music/DJ Library/GARAGE/2-Next-Phase-My-Desire--Scot-1BVWKO.flac
+/Users/artemgusarov/Music/DJ Library/Hard Techno/01_DBBD & Miss Bashful-Muschi Muschi_BPM_150-6A-Other.mp3
+/Users/artemgusarov/Music/DJ Library/Hard Techno/01_Maddix & Fēlēs-My Gasoline-Big Room H.m4a
+/Users/artemgusarov/Music/DJ Library/Hard Techno/02_Marsi-Durch Die Nacht_BPM_145-5A-Other.mp3
+/Users/artemgusarov/Music/DJ Library/Hard Techno/KMTK - Acid Drift.mp3
+/Users/artemgusarov/Music/DJ Library/Hard Techno/Vlace, Amazement - Rage (Original Mix).mp3
+/Users/artemgusarov/Music/DJ Library/Hard groove/4-PPJ-Dropi-Dropa-WT5LXK.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Aejisei-Overdrive_BPM_130-5A-Other.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Cat Ryan-Like This_BPM_127-2A-Other.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Cloonee, Young M․A & InntRaw-Stephanie_BPM_130-7A-Hip-Hop; T.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Dehousy-Wanna Be_BPM_124-6A-Other.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Dombresky-Hi Life_BPM_130-8A-Other.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Janice Mangion-Burnin'_BPM_128-4A-Pop.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Matroda, Martin Ikin & Sian-Lee-4U_BPM_128-7A-Electronic.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Mau P-BEATS FOR THE UNDERGROUND_BPM_126-3A-Big Room H.mp3
+/Users/artemgusarov/Music/DJ Library/House/01_Mousse T․-All I Want Is the Bass (extended)_BPM_124-10A-Disco; Hou.mp3
+/Users/artemgusarov/Music/DJ Library/House/02_Jude & Frank-Everybody’s Groovin’ - Extended Mix_BPM_128-8A-Other.mp3
+/Users/artemgusarov/Music/DJ Library/House/02_Michael Jay-Say Mama (Original Mix)_BPM_124-9B-Electronic.flac
+/Users/artemgusarov/Music/DJ Library/House/1-Bluckther-La-Manguelen-a-I0O3LF.flac
+/Users/artemgusarov/Music/DJ Library/House/1-Crazibiza-Like-a-King--Or-7YERLO.mp3
+/Users/artemgusarov/Music/DJ Library/House/1-HP-Vince-Dope--Renegade--G6CN48.mp3
+/Users/artemgusarov/Music/DJ Library/House/1-Jay-Vegas-Break-Ya-Down---MRJWWW.mp3
+/Users/artemgusarov/Music/DJ Library/House/1-Kurd-Maverick-P-gale--Radio-E-BDT8NH.flac
+/Users/artemgusarov/Music/DJ Library/House/1-Matt-Sassari-Baiana--Club-Mi-W9YF1D.flac
+/Users/artemgusarov/Music/DJ Library/House/1-Sugar-Hill-Felling--Origin-CUK6UB.flac
+/Users/artemgusarov/Music/DJ Library/House/3-Anil-Aras-Feel-Free-OU4WZQ.mp3
+/Users/artemgusarov/Music/DJ Library/House/48_Dennis Christopher vs Whitney Houston-It's Not Right, but It's OK (Big Room vocal mix)_BPM_128-A#-Contempora.mp3
+/Users/artemgusarov/Music/DJ Library/MNML/3-Sebo-K-Too-Hot-JPKEHU.flac
+/Users/artemgusarov/Music/DJ Library/TRIP Recordings/Nocow - eto ne to /13_Nocow & Cerrot-universo freaky_BPM_151-8A-Techno.mp3
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Andrew-Savich-The-Mind-2M04PH.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Latmun-Dance--IHFAXO.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/1-William-Kiss-Hold-Up-MH3R4B.flac
+/Users/artemgusarov/Music/DJ Library/Tech House/Ken Spieker - The New Jam (Original Mix).mp4
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/BEC/01. Tibetan Monks - Bec.flac
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/Miss Kittin/2002 - Miss Kittin - On The Road (CD, Comp, Mixed)/01 - Miss Kittin - On The Road (2001).mp3
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/Nina kraviz set/2-Bailey-Ibbs-Tempo-DDBPD2.flac
+/Users/artemgusarov/Music/DJ Library/mix/00_-HILLS - The Booth.mp4
+/Users/artemgusarov/Music/DJ Library/mix/Club_Cab_Generator.flac
+/Users/artemgusarov/Music/DJ Library/new year 2025/01_Cheesecake Boys, Crazibiza, Belle-Good Life (Original Mix)_BPM_126-9A.flac
+/Users/artemgusarov/Music/DJ Library/new year 2025/01_Ghostbusterz-Good & Hot_BPM_118-10B.flac
+/Users/artemgusarov/Music/DJ Library/new year 2025/01_Sandro Puddu-Shut Up!_BPM_124-7A-Funky Hous.flac
+
+## CHANGED ZONES
+
+# GREEN -> YELLOW
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Arkady-Antsyrev-Loud--n-Proud-LTH30S.flac
+# GREEN -> YELLOW
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Ninetree-Auntie--Original-Mix--6D3PLA.flac
+# PURPLE -> GREEN
+/Users/artemgusarov/Music/DJ Library/Tech House/1-Slugg-No--No--No-XGOI2N.flac
+# PURPLE -> GREEN
+/Users/artemgusarov/Music/DJ Library/Tech House/2-Bombay-Traffic-Soul-Brother--Superlover-Remix--047W95.flac
+# GREEN -> YELLOW
+/Users/artemgusarov/Music/DJ Library/Tech House/2-Marsolo-Don-t-Delete--Original-Mix--QM3WGS.flac
+# GREEN -> PURPLE
+/Users/artemgusarov/Music/DJ Library/Tech House/J.K. Rollin/1-J-K--Rollin-Let-The-Rhythm-Drop-R0X6PI.flac
+# PURPLE -> GREEN
+/Users/artemgusarov/Music/DJ Library/Tech House/PREMIERE  Beyond Limits - Lunch.mp4
+# PURPLE -> GREEN
+/Users/artemgusarov/Music/DJ Library/Tech House/Sidney Charles/2-Sidney-Charles-The-Future-is-Now--P36YLD.flac
+# YELLOW -> GREEN
+/Users/artemgusarov/Music/DJ Library/_UNSORTED/Move It Or Lose It - Papa Nugs.m4a
+# PURPLE -> GREEN
+/Users/artemgusarov/Music/DJ Library/mix/00_Crewcutz-Beat Division.m4a
+# GREEN -> YELLOW
+/Users/artemgusarov/Music/DJ Library/mix/01_SOSA feat․ Gloria Ann Taylor-What’s Your World-R&B; Soul.mp4

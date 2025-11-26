@@ -46,6 +46,10 @@ class ZoneTrainer:
         self.use_fast_mode = use_fast_mode
         self._should_stop = False  # Graceful stop flag
 
+        # Checkpoint manager (ALWAYS created for features caching and model checkpoints)
+        self.checkpoint_manager = CheckpointManager(checkpoint_dir="models/checkpoints")
+        logger.info(f"✅ Checkpoint manager initialized: {self.checkpoint_manager.checkpoint_dir}")
+
         # Feature extractor (choose fast or full version)
         if use_fast_mode:
             self.feature_extractor = FastZoneFeatureExtractor()
@@ -158,7 +162,6 @@ class ZoneTrainer:
         logger.info("Graceful stop requested")
 
     def extract_features(self, use_cache: bool = True,
-                        checkpoint_manager: Optional[CheckpointManager] = None,
                         progress_callback: Optional[Callable] = None,
                         log_callback: Optional[Callable] = None,
                         checkpoint_interval: int = 5) -> pd.DataFrame:
@@ -167,21 +170,20 @@ class ZoneTrainer:
 
         Args:
             use_cache: Try to load cached features
-            checkpoint_manager: Checkpoint manager for caching
             progress_callback: Progress callback
             log_callback: Log callback
-            checkpoint_interval: Save progress every N tracks (default: 10)
+            checkpoint_interval: Save progress every N tracks (default: 5)
 
         Returns:
             Features DataFrame
         """
-        # Try to load from cache
-        if use_cache and checkpoint_manager:
-            cached_features = checkpoint_manager.load_features()
+        # Try to load from cache (ALWAYS available via self.checkpoint_manager)
+        if use_cache:
+            cached_features = self.checkpoint_manager.load_features()
             if cached_features is not None:
-                self._log(log_callback, "INFO", "Loaded features from cache")
+                self._log(log_callback, "INFO", "✅ Loaded features from cache")
                 self.features_list = cached_features['features_list'].tolist()
-                self._log(log_callback, "INFO", f"Resuming from {len(self.features_list)} cached features")
+                self._log(log_callback, "INFO", f"  Resuming from {len(self.features_list)} cached features")
                 # Start from where we left off
                 start_index = len(self.features_list)
             else:
@@ -200,8 +202,8 @@ class ZoneTrainer:
             if self._should_stop:
                 self._log(log_callback, "WARNING", f"⏸️  Graceful stop requested at {i}/{total} tracks")
                 # Save checkpoint before stopping
-                if checkpoint_manager and len(self.features_list) > 0:
-                    self._save_incremental_checkpoint(checkpoint_manager, i, total, log_callback)
+                if len(self.features_list) > 0:
+                    self._save_incremental_checkpoint(i, total, log_callback)
                     self._log(log_callback, "INFO", "💾 Final checkpoint saved before stopping")
                 break
 
@@ -219,8 +221,8 @@ class ZoneTrainer:
                 self._log(log_callback, "INFO", f"✓ Completed {Path(audio_path).name}")
 
                 # Incremental checkpoint every N tracks
-                if checkpoint_manager and (i + 1) % checkpoint_interval == 0:
-                    self._save_incremental_checkpoint(checkpoint_manager, i + 1, total, log_callback)
+                if (i + 1) % checkpoint_interval == 0:
+                    self._save_incremental_checkpoint(i + 1, total, log_callback)
 
             except Exception as e:
                 self._log(log_callback, "ERROR", f"Failed to extract from {audio_path}: {e}")
@@ -229,8 +231,8 @@ class ZoneTrainer:
                 # Handle Ctrl+C gracefully
                 self._log(log_callback, "WARNING", "⏸️  Keyboard interrupt detected")
                 self._should_stop = True
-                if checkpoint_manager and len(self.features_list) > 0:
-                    self._save_incremental_checkpoint(checkpoint_manager, i, total, log_callback)
+                if len(self.features_list) > 0:
+                    self._save_incremental_checkpoint(i, total, log_callback)
                     self._log(log_callback, "INFO", "💾 Checkpoint saved after interrupt")
                 raise
 
@@ -256,17 +258,16 @@ class ZoneTrainer:
             'features_list': self.features_list
         })
 
-        # Always save features cache for faster re-runs
-        if checkpoint_manager:
-            self._log(log_callback, "INFO", f"💾 Saving features cache to {checkpoint_manager.checkpoint_dir}/features.pkl")
-            checkpoint_manager.save_checkpoint(
-                model=None,
-                epoch=0,
-                metrics={},
-                algorithm='features',
-                features_df=features_df
-            )
-            self._log(log_callback, "INFO", f"✓ Features cache saved successfully")
+        # ALWAYS save features cache (unconditionally via self.checkpoint_manager)
+        self._log(log_callback, "INFO", f"💾 Saving features cache to {self.checkpoint_manager.checkpoint_dir}/features.pkl")
+        self.checkpoint_manager.save_checkpoint(
+            model=None,
+            epoch=0,
+            metrics={},
+            algorithm='features',
+            features_df=features_df
+        )
+        self._log(log_callback, "INFO", f"✅ Features cached successfully")
 
         return features_df
 
@@ -351,7 +352,6 @@ class ZoneTrainer:
         self._log(log_callback, "INFO", f"{'='*60}\n")
 
     def train_model(self, algorithm: str,
-                   checkpoint_manager: Optional[CheckpointManager] = None,
                    resume: bool = False,
                    progress_callback: Optional[Callable] = None,
                    log_callback: Optional[Callable] = None,
@@ -361,7 +361,6 @@ class ZoneTrainer:
 
         Args:
             algorithm: 'xgboost', 'neural_network', or 'ensemble'
-            checkpoint_manager: Checkpoint manager
             resume: Resume from checkpoint
             progress_callback: Progress callback
             log_callback: Log callback
@@ -372,9 +371,9 @@ class ZoneTrainer:
         """
         self._log(log_callback, "INFO", f"Training {algorithm} classifier...")
 
-        # Check for resumption
-        if resume and checkpoint_manager:
-            resumer = TrainingResumer(checkpoint_manager)
+        # Check for resumption (ALWAYS available via self.checkpoint_manager)
+        if resume:
+            resumer = TrainingResumer(self.checkpoint_manager)
             if resumer.can_resume(algorithm):
                 self._log(log_callback, "INFO", f"Resuming {algorithm} from checkpoint")
 
@@ -407,14 +406,13 @@ class ZoneTrainer:
         test_metrics = self._evaluate_model(model, algorithm, log_callback)
         metrics.update(test_metrics)
 
-        # Save final checkpoint
-        if checkpoint_manager:
-            checkpoint_manager.save_checkpoint(
-                model=model,
-                epoch=metrics.get('epochs_trained', metrics.get('best_iteration', 0)),
-                metrics=metrics,
-                algorithm=algorithm
-            )
+        # Save final checkpoint (ALWAYS available via self.checkpoint_manager)
+        self.checkpoint_manager.save_checkpoint(
+            model=model,
+            epoch=metrics.get('epochs_trained', metrics.get('best_iteration', 0)),
+            metrics=metrics,
+            algorithm=algorithm
+        )
 
         return model, metrics
 
@@ -501,11 +499,8 @@ class ZoneTrainer:
         save_dir = Path(save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        # Setup checkpoints - ALWAYS create checkpoint manager for feature caching
-        if checkpoint_dir is None:
-            # Use default checkpoint directory for feature caching
-            checkpoint_dir = 'models/checkpoints'
-        checkpoint_manager = CheckpointManager(checkpoint_dir)
+        # Note: checkpoint_manager already initialized in __init__ (self.checkpoint_manager)
+        # checkpoint_dir parameter is now ignored (deprecated)
 
         results = {}
 
@@ -518,10 +513,9 @@ class ZoneTrainer:
             num_tracks = self.load_training_data(progress_callback, log_callback)
             results['num_tracks'] = num_tracks
 
-            # 2. Extract features
+            # 2. Extract features (uses self.checkpoint_manager automatically)
             self.extract_features(
                 use_cache=True,
-                checkpoint_manager=checkpoint_manager,
                 progress_callback=progress_callback,
                 log_callback=log_callback
             )
@@ -540,7 +534,6 @@ class ZoneTrainer:
 
                 model, metrics = self.train_model(
                     algo,
-                    checkpoint_manager=checkpoint_manager,
                     progress_callback=progress_callback,
                     log_callback=log_callback,
                     **kwargs
@@ -601,14 +594,12 @@ class ZoneTrainer:
             self._log(log_callback, "ERROR", f"Training failed: {e}")
             raise
 
-    def _save_incremental_checkpoint(self, checkpoint_manager: CheckpointManager,
-                                     current: int, total: int,
+    def _save_incremental_checkpoint(self, current: int, total: int,
                                      log_callback: Optional[Callable] = None):
         """
         Save incremental checkpoint during feature extraction.
 
         Args:
-            checkpoint_manager: Checkpoint manager
             current: Current track number
             total: Total tracks
             log_callback: Log callback
@@ -621,8 +612,8 @@ class ZoneTrainer:
                 'features_list': self.features_list
             })
 
-            # Save checkpoint
-            checkpoint_manager.save_checkpoint(
+            # Save checkpoint (ALWAYS available via self.checkpoint_manager)
+            self.checkpoint_manager.save_checkpoint(
                 model=None,
                 epoch=current,
                 metrics={'progress': current / total},
