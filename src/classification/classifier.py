@@ -80,6 +80,7 @@ class EnergyZoneClassifier:
         self.ml_model = None
         self.ml_scaler = None
         self.ml_feature_columns = None
+        self.ml_label_encoder = None
 
         if model_path:
             self._load_model(model_path)
@@ -175,16 +176,37 @@ class EnergyZoneClassifier:
             with open(model_path, 'rb') as f:
                 model_data = pickle.load(f)
 
-            # Handle both old format (just model) and new format (dict)
+            # Handle multiple formats
             if isinstance(model_data, dict):
-                self.ml_model = model_data.get('model')
-                self.ml_scaler = model_data.get('scaler')
-                self.ml_feature_columns = model_data.get('feature_columns')
-                logger.info(f"Loaded ML model from {model_path} (algorithm: {model_data.get('algorithm')})")
+                # ProductionPipeline format (recommended)
+                if 'selected_features' in model_data:
+                    self.ml_model = model_data.get('model')
+                    self.ml_scaler = model_data.get('scaler')
+                    self.ml_feature_columns = model_data.get('selected_features')
+                    self.ml_label_encoder = model_data.get('label_encoder')
+                    config = model_data.get('config', {})
+                    stats = model_data.get('training_stats', {})
+                    logger.info(
+                        f"Loaded ProductionPipeline model: {config.get('algorithm', 'unknown')}, "
+                        f"CV={stats.get('cv_accuracy', 0):.1%}, "
+                        f"{len(self.ml_feature_columns)} features"
+                    )
+                # Legacy dict format
+                elif 'feature_columns' in model_data:
+                    self.ml_model = model_data.get('model')
+                    self.ml_scaler = model_data.get('scaler')
+                    self.ml_feature_columns = model_data.get('feature_columns')
+                    self.ml_label_encoder = model_data.get('label_encoder')
+                    logger.info(f"Loaded legacy model: {model_data.get('algorithm', 'unknown')}")
+                else:
+                    # Minimal dict format
+                    self.ml_model = model_data.get('model')
+                    self.ml_scaler = model_data.get('scaler')
+                    logger.info(f"Loaded minimal model from {model_path}")
             else:
-                # Old format - just the model
+                # Very old format - just the model
                 self.ml_model = model_data
-                logger.info(f"Loaded ML model from {model_path} (legacy format)")
+                logger.info(f"Loaded raw model from {model_path}")
 
         except Exception as e:
             logger.warning(f"Failed to load ML model: {e}")
@@ -210,6 +232,15 @@ class EnergyZoneClassifier:
         """
         Train ML model on labeled data.
 
+        DEPRECATED: Use ProductionPipeline for training instead:
+            from src.training.production_pipeline import ProductionPipeline
+            pipeline = ProductionPipeline()
+            pipeline.train(user_path, deam_path, annotations_path)
+            pipeline.save('models/production/model.pkl')
+
+        ProductionPipeline includes XGBoost, feature selection, and
+        normalized drop features for better accuracy.
+
         Args:
             X: Feature vectors (N, 16)
             y: Labels (N,) - 0=yellow, 1=green, 2=purple
@@ -217,6 +248,7 @@ class EnergyZoneClassifier:
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.model_selection import cross_val_score
 
+        logger.warning("Using legacy train_model(). Consider ProductionPipeline for better results.")
         logger.info(f"Training ML model on {len(X)} samples...")
 
         # Train Random Forest

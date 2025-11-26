@@ -69,6 +69,12 @@ class ZoneFeatures:
     drop_frequency: float = 0.0  # Drops per minute
     peak_energy_ratio: float = 0.0  # Peak energy / mean energy
 
+    # Improved drop detection features (breakdown→drop contrast)
+    drop_contrast_mean: float = 0.0  # Average contrast between breakdown and drop
+    drop_contrast_max: float = 0.0  # Maximum single drop contrast
+    drop_count: float = 0.0  # Number of true breakdown→drop patterns
+    drop_intensity: float = 0.0  # Average drop peak energy / mean track energy
+
     # Euphoria indicators (for PURPLE zone)
     rhythmic_regularity: float = 0.0  # Rhythm stability (0-1, 1=very regular)
     harmonic_complexity: float = 0.0  # Harmonic richness (entropy)
@@ -153,6 +159,14 @@ class ZoneFeatures:
             self.peak_energy_ratio,
         ]
 
+        # Improved drop detection (4)
+        drop_features = [
+            self.drop_contrast_mean,
+            self.drop_contrast_max,
+            self.drop_count,
+            self.drop_intensity,
+        ]
+
         # Euphoria indicators (2)
         euphoria_features = [
             self.rhythmic_regularity,
@@ -166,7 +180,7 @@ class ZoneFeatures:
             self.dynamic_range,
         ]
 
-        # Combine all traditional features (19 + 2 + 4 + 14 + 2 + 3 + 2 + 2 + 3 = 51)
+        # Combine all traditional features (19 + 2 + 4 + 14 + 2 + 3 + 2 + 4 + 2 + 3 = 55)
         traditional = np.concatenate([
             basic_features,
             emotion_features,
@@ -175,6 +189,7 @@ class ZoneFeatures:
             hp_features,
             buildup_features,
             drive_features,
+            drop_features,
             euphoria_features,
             climax_features
         ])
@@ -443,6 +458,10 @@ class ZoneFeatureExtractor:
         else:
             features['peak_energy_ratio'] = 1.0
 
+        # Improved drop detection: find actual breakdown→drop patterns
+        drop_features = self._extract_drop_features(rms, sr)
+        features.update(drop_features)
+
         # Euphoria indicators
         # 1. Rhythmic regularity (from beat intervals)
         if len(beats) > 2:
@@ -490,6 +509,96 @@ class ZoneFeatureExtractor:
             features['dynamic_range'] = float(np.max(rms_db) - np.min(rms_db))
         else:
             features['dynamic_range'] = 0.0
+
+        return features
+
+    def _extract_drop_features(self, rms: np.ndarray, sr: int) -> dict:
+        """
+        Extract improved drop detection features.
+
+        Finds actual breakdown→drop patterns by detecting:
+        1. Energy valleys (breakdowns)
+        2. Following energy peaks (drops)
+        3. Contrast between them
+
+        Args:
+            rms: RMS energy array
+            sr: Sample rate
+
+        Returns:
+            Dictionary with drop features
+        """
+        from scipy.signal import find_peaks
+        from scipy.ndimage import median_filter
+
+        features = {
+            'drop_contrast_mean': 0.0,
+            'drop_contrast_max': 0.0,
+            'drop_count': 0.0,
+            'drop_intensity': 0.0,
+        }
+
+        if len(rms) < 100:  # Need enough data for pattern detection
+            return features
+
+        # Smooth RMS to reduce noise (use ~0.5s window)
+        hop_length = 512  # librosa default
+        window_frames = int(0.5 * sr / hop_length)
+        window_frames = max(3, window_frames if window_frames % 2 == 1 else window_frames + 1)
+        rms_smooth = median_filter(rms, size=window_frames)
+
+        mean_energy = np.mean(rms_smooth)
+        std_energy = np.std(rms_smooth)
+
+        if mean_energy < 1e-6:
+            return features
+
+        # Find valleys (breakdowns) - local minima below mean
+        valley_threshold = mean_energy - 0.3 * std_energy
+        valleys, valley_props = find_peaks(-rms_smooth, height=-valley_threshold, distance=50)
+
+        # Find peaks (drops) - local maxima above mean
+        peak_threshold = mean_energy + 0.3 * std_energy
+        peaks, peak_props = find_peaks(rms_smooth, height=peak_threshold, distance=50)
+
+        if len(valleys) == 0 or len(peaks) == 0:
+            return features
+
+        # Match valleys to following peaks (breakdown→drop pattern)
+        drop_contrasts = []
+        drop_peak_energies = []
+
+        for valley_idx in valleys:
+            # Find nearest peak AFTER this valley (within ~8 seconds / ~350 frames)
+            following_peaks = peaks[peaks > valley_idx]
+            if len(following_peaks) == 0:
+                continue
+
+            # Get first peak after valley within reasonable distance
+            next_peak = following_peaks[0]
+            distance = next_peak - valley_idx
+
+            # Drop should happen within ~8 seconds after breakdown
+            max_distance = int(8.0 * sr / hop_length)
+            if distance > max_distance:
+                continue
+
+            # Calculate contrast
+            valley_energy = rms_smooth[valley_idx]
+            peak_energy = rms_smooth[next_peak]
+            contrast = (peak_energy - valley_energy) / (mean_energy + 1e-6)
+
+            # Only count significant drops (contrast > 0.5 = 50% of mean energy)
+            if contrast > 0.5:
+                drop_contrasts.append(contrast)
+                drop_peak_energies.append(peak_energy)
+
+        # Calculate features
+        if len(drop_contrasts) > 0:
+            features['drop_contrast_mean'] = float(np.mean(drop_contrasts))
+            features['drop_contrast_max'] = float(np.max(drop_contrasts))
+            features['drop_count'] = float(len(drop_contrasts))
+            features['drop_intensity'] = float(np.mean(drop_peak_energies) / mean_energy)
 
         return features
 
@@ -581,6 +690,207 @@ class ZoneFeatureExtractor:
         except Exception as e:
             logger.warning(f"HuBERT extraction failed: {e}")
             return np.zeros(768)
+
+    def extract_frames(self, audio_path: str, frame_size: float = 0.5) -> 'pd.DataFrame':
+        """
+        Extract frame-level features (DEAM-compatible format).
+
+        Fast extraction that outputs features per frame (default 0.5s).
+        Compatible with DEAM dataset format for unified training.
+
+        Args:
+            audio_path: Path to audio file
+            frame_size: Frame size in seconds (default 0.5s like DEAM)
+
+        Returns:
+            DataFrame with columns per frame:
+            - frameTime: time in seconds
+            - rms_energy, rms_energy_delta
+            - zcr
+            - spectral_centroid, spectral_rolloff
+            - mfcc_1..5, mfcc_1_delta..5_delta
+        """
+        import pandas as pd
+
+        # Load audio
+        y, sr = librosa.load(audio_path, sr=self.sample_rate)
+
+        # Calculate hop_length for desired frame_size
+        # frame_size = hop_length / sr => hop_length = frame_size * sr
+        hop_length = int(frame_size * sr)
+        n_fft = 2048  # Standard FFT size
+
+        # Extract frame-level features
+        # RMS energy
+        rms = librosa.feature.rms(y=y, frame_length=n_fft, hop_length=hop_length)[0]
+
+        # Zero crossing rate
+        zcr = librosa.feature.zero_crossing_rate(y, frame_length=n_fft, hop_length=hop_length)[0]
+
+        # Spectral centroid
+        centroid = librosa.feature.spectral_centroid(y=y, sr=sr, n_fft=n_fft, hop_length=hop_length)[0]
+
+        # Spectral rolloff
+        rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, n_fft=n_fft, hop_length=hop_length)[0]
+
+        # MFCCs (first 5)
+        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=5, n_fft=n_fft, hop_length=hop_length)
+
+        # Calculate deltas
+        rms_delta = np.concatenate([[0], np.diff(rms)])
+        mfcc_deltas = np.vstack([
+            np.concatenate([[0], np.diff(mfccs[i])]) for i in range(5)
+        ])
+
+        # Frame times
+        n_frames = len(rms)
+        frame_times = np.arange(n_frames) * frame_size
+
+        # Build DataFrame
+        data = {
+            'frameTime': frame_times,
+            'rms_energy': rms,
+            'rms_energy_delta': rms_delta,
+            'zcr': zcr,
+            'spectral_centroid': centroid,
+            'spectral_rolloff': rolloff,
+        }
+
+        # Add MFCCs
+        for i in range(5):
+            data[f'mfcc_{i+1}'] = mfccs[i]
+            data[f'mfcc_{i+1}_delta'] = mfcc_deltas[i]
+
+        df = pd.DataFrame(data)
+        return df
+
+    def extract_frames_fast(self, audio_path: str, frame_size: float = 0.5) -> dict:
+        """
+        Extract frame-level features and aggregate to track-level (fastest method).
+
+        Similar to DEAM processing: extract per-frame, then aggregate.
+
+        Args:
+            audio_path: Path to audio file
+            frame_size: Frame size in seconds
+
+        Returns:
+            Dictionary with aggregated features (ready for classifier)
+        """
+        frames_df = self.extract_frames(audio_path, frame_size)
+
+        # Aggregate to track level
+        features = {}
+
+        # RMS features
+        rms = frames_df['rms_energy'].values
+        features['rms_energy'] = float(np.mean(rms))
+        features['energy_variance'] = float(np.std(rms))
+        features['low_energy'] = float(np.sum(rms < np.mean(rms)) / len(rms))
+        features['peak_energy_ratio'] = float(np.max(rms) / (np.mean(rms) + 1e-6))
+
+        # Drop detection from delta
+        rms_delta = frames_df['rms_energy_delta'].values
+        features['drop_strength'] = float(np.percentile(np.abs(rms_delta), 90))
+
+        # ZCR
+        features['zero_crossing_rate'] = float(frames_df['zcr'].mean())
+
+        # Spectral features
+        features['spectral_centroid'] = float(frames_df['spectral_centroid'].mean())
+        features['spectral_rolloff'] = float(frames_df['spectral_rolloff'].mean())
+
+        # Calculate brightness proxy (rolloff / centroid ratio)
+        features['brightness'] = float(
+            frames_df['spectral_rolloff'].mean() / (frames_df['spectral_centroid'].mean() + 1e-6)
+        )
+
+        # MFCCs
+        for i in range(1, 6):
+            features[f'mfcc_{i}_mean'] = float(frames_df[f'mfcc_{i}'].mean())
+            features[f'mfcc_{i}_std'] = float(frames_df[f'mfcc_{i}'].std())
+
+        # Drop detection from frames
+        drop_features = self._extract_drop_features_from_frames(rms, frame_size)
+        features.update(drop_features)
+
+        return features
+
+    def _extract_drop_features_from_frames(self, rms: np.ndarray, frame_size: float) -> dict:
+        """
+        Extract drop detection features from frame-level RMS.
+
+        Args:
+            rms: Frame-level RMS values
+            frame_size: Frame size in seconds
+
+        Returns:
+            Drop detection features
+        """
+        from scipy.signal import find_peaks
+
+        features = {
+            'drop_contrast_mean': 0.0,
+            'drop_contrast_max': 0.0,
+            'drop_count': 0.0,
+            'drop_intensity': 0.0,
+        }
+
+        if len(rms) < 20:
+            return features
+
+        mean_energy = np.mean(rms)
+        std_energy = np.std(rms)
+
+        if mean_energy < 1e-6:
+            return features
+
+        # Find valleys and peaks
+        # Distance in frames (~4 seconds minimum between drops)
+        min_distance = int(4.0 / frame_size)
+
+        valley_threshold = mean_energy - 0.3 * std_energy
+        valleys, _ = find_peaks(-rms, height=-valley_threshold, distance=min_distance)
+
+        peak_threshold = mean_energy + 0.3 * std_energy
+        peaks, _ = find_peaks(rms, height=peak_threshold, distance=min_distance)
+
+        if len(valleys) == 0 or len(peaks) == 0:
+            return features
+
+        # Match valleys to following peaks
+        drop_contrasts = []
+        drop_peak_energies = []
+
+        # Max frames between valley and peak (~8 seconds)
+        max_distance = int(8.0 / frame_size)
+
+        for valley_idx in valleys:
+            following_peaks = peaks[peaks > valley_idx]
+            if len(following_peaks) == 0:
+                continue
+
+            next_peak = following_peaks[0]
+            distance = next_peak - valley_idx
+
+            if distance > max_distance:
+                continue
+
+            valley_energy = rms[valley_idx]
+            peak_energy = rms[next_peak]
+            contrast = (peak_energy - valley_energy) / (mean_energy + 1e-6)
+
+            if contrast > 0.5:
+                drop_contrasts.append(contrast)
+                drop_peak_energies.append(peak_energy)
+
+        if len(drop_contrasts) > 0:
+            features['drop_contrast_mean'] = float(np.mean(drop_contrasts))
+            features['drop_contrast_max'] = float(np.max(drop_contrasts))
+            features['drop_count'] = float(len(drop_contrasts))
+            features['drop_intensity'] = float(np.mean(drop_peak_energies) / mean_energy)
+
+        return features
 
     def extract_batch(self, audio_paths: list, show_progress: bool = True) -> list:
         """

@@ -139,7 +139,7 @@ def main():
         'spectral_rolloff', 'energy_variance', 'mfcc_1_mean', 'mfcc_1_std',
         'mfcc_2_mean', 'mfcc_2_std', 'mfcc_3_mean', 'mfcc_3_std',
         'mfcc_4_mean', 'mfcc_4_std', 'mfcc_5_mean', 'mfcc_5_std',
-        'low_energy', 'brightness', 'drop_intensity'
+        'low_energy', 'brightness', 'drop_strength'
     ]
 
     DJ_FEATURES = [
@@ -148,7 +148,9 @@ def main():
         'harmonic_ratio', 'percussive_ratio', 'energy_slope',
         'energy_buildup_ratio', 'onset_acceleration', 'drop_frequency',
         'peak_energy_ratio', 'rhythmic_regularity', 'harmonic_complexity',
-        'dynamic_range'
+        'dynamic_range',
+        # New drop detection features
+        'drop_contrast_mean', 'drop_contrast_max', 'drop_count', 'drop_intensity'
     ]
 
     ALL_BASE_FEATURES = BASE_FEATURES + DJ_FEATURES
@@ -233,9 +235,14 @@ def main():
                     val = float(np.nanmean(val)) if val else 0.0
                 elif val is None:
                     val = 0.0
-                elif isinstance(val, float) and np.isnan(val):
-                    val = 0.0
-                row.append(float(val))
+                else:
+                    try:
+                        val = float(val)
+                        if np.isnan(val):
+                            val = 0.0
+                    except (TypeError, ValueError):
+                        val = 0.0
+                row.append(val)
 
             # Extract embeddings if requested
             embedding = None
@@ -245,6 +252,11 @@ def main():
                     embedding = np.array(emb)
                 else:
                     continue  # Skip tracks without embeddings
+
+            # Verify row length
+            if len(row) != len(ALL_BASE_FEATURES):
+                print(f"  Warning: {Path(path).name} has {len(row)} features (expected {len(ALL_BASE_FEATURES)})")
+                continue
 
             X_base_list.append(row)
             if embedding is not None:
