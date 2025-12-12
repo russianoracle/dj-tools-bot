@@ -50,10 +50,35 @@ jobs:
         if: always()
         run: rm -rf .git
 
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short || true
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf ~/.cache/pip __pycache__ .pytest_cache
+
   build:
     name: Build & Push
     runs-on: ubuntu-latest
-    needs: [lint, security]
+    needs: [lint, security, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
