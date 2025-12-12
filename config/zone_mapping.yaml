@@ -1,0 +1,63 @@
+# Zone Mapping Configuration
+# Определяет правила конвертации arousal-valence в зоны
+
+# Шкала arousal-valence в DEAM
+arousal_scale:
+  min: 1.6
+  max: 8.1
+
+valence_scale:
+  min: 1.6
+  max: 8.4
+
+# Стратегия маппинга: 'simple' или 'advanced'
+# simple: только по arousal
+# advanced: по arousal + valence (2D пространство)
+mapping_strategy: simple
+
+# === SIMPLE MAPPING (только arousal) ===
+simple_thresholds:
+  yellow_max: 4.0    # arousal < 4.0 → YELLOW
+  purple_min: 6.0    # arousal > 6.0 → PURPLE
+  # GREEN: всё что между 4.0 и 6.0
+
+# === ADVANCED MAPPING (arousal + valence) ===
+# Используется только если mapping_strategy: advanced
+advanced_rules:
+  yellow:
+    # Зона отдыха: низкая энергия, нейтральное/позитивное настроение
+    arousal_max: 4.5
+    valence_min: 4.0
+
+  purple:
+    # Зона энергии: высокая энергия (любое настроение)
+    # ИЛИ средняя энергия + негативное настроение (агрессивное)
+    - arousal_min: 6.0  # Высокая энергия
+    - arousal_min: 5.0  # ИЛИ средняя энергия
+      valence_max: 3.5  # + негативное настроение
+
+  green:
+    # Всё остальное (по умолчанию)
+    default: true
+
+# Альтернативные пресеты (можно быстро переключать)
+presets:
+  conservative:
+    # Узкие зоны, больше GREEN треков
+    yellow_max: 3.5
+    purple_min: 6.5
+
+  aggressive:
+    # Широкие зоны, меньше GREEN треков
+    yellow_max: 4.5
+    purple_min: 5.5
+
+  balanced:
+    # Сбалансированное распределение (по умолчанию)
+    yellow_max: 4.0
+    purple_min: 6.0
+
+  dj_focused:
+    # Для DJ-треков: чёткие энергетические зоны
+    yellow_max: 3.8
+    purple_min: 6.2

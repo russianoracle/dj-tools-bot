@@ -1,0 +1,113 @@
+version: "3.9"
+
+services:
+  bot:
+    build: .
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID}/mood-classifier:${TAG:-latest}
+    container_name: mood-classifier-bot
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_USER_ID=${ADMIN_USER_ID}
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_DIR=/app/cache
+      - DOWNLOADS_DIR=/app/downloads
+      - MAX_FILE_SIZE_MB=500
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - cache_data:/app/cache
+      - downloads_data:/app/downloads
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  worker:
+    build: .
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID}/mood-classifier:${TAG:-latest}
+    container_name: mood-classifier-worker
+    command: celery -A src.services.celery_app worker --loglevel=info --concurrency=2
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_DIR=/app/cache
+      - DOWNLOADS_DIR=/app/downloads
+    volumes:
+      - cache_data:/app/cache
+      - downloads_data:/app/downloads
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+  api:
+    build: .
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID}/mood-classifier:${TAG:-latest}
+    container_name: mood-classifier-api
+    command: uvicorn src.services.api:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_DIR=/app/cache
+    volumes:
+      - cache_data:/app/cache
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: mood-classifier-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Flower for Celery monitoring
+  flower:
+    image: mher/flower:2.0
+    container_name: mood-classifier-flower
+    command: celery --broker=redis://redis:6379/0 flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    profiles:
+      - monitoring
+
+volumes:
+  cache_data:
+  downloads_data:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge
