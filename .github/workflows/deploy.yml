@@ -122,27 +122,33 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          YC_REGISTRY_ID: ${{ secrets.YC_REGISTRY_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ADMIN_USER_ID: ${{ secrets.ADMIN_USER_ID }}
+          YC_SA_JSON_KEY: ${{ secrets.YC_SA_JSON_KEY }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: YC_REGISTRY_ID,TELEGRAM_BOT_TOKEN,ADMIN_USER_ID,YC_SA_JSON_KEY
           script: |
             cd ~/app
 
             # Login to Yandex Container Registry
-            echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login cr.yandex --username json_key --password-stdin
+            echo "$YC_SA_JSON_KEY" | docker login cr.yandex --username json_key --password-stdin
 
             # Pull latest image
-            docker pull cr.yandex/${{ secrets.YC_REGISTRY_ID }}/mood-classifier:latest
+            docker pull cr.yandex/$YC_REGISTRY_ID/mood-classifier:latest
 
-            # Export env vars and restart
-            export YC_REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
-            export TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
-            export ADMIN_USER_ID=${{ secrets.ADMIN_USER_ID }}
+            # Export env vars for docker-compose
+            export YC_REGISTRY_ID=$YC_REGISTRY_ID
+            export TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
+            export ADMIN_USER_ID=$ADMIN_USER_ID
 
-            # Stop old container, start new
-            docker compose down || true
-            docker compose up -d
+            # Stop old container, start new (using docker-compose v1 syntax)
+            docker-compose down || true
+            docker-compose up -d
 
             # Cleanup
             docker logout cr.yandex
@@ -150,3 +156,4 @@ jobs:
 
             # Show status
             docker ps
+            docker logs dj-tools-bot --tail 10 2>&1 || true
