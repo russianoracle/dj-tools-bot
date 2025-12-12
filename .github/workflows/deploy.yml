@@ -113,3 +113,40 @@ jobs:
         run: |
           docker system prune -af
           rm -rf ~/.docker/config.json
+
+  deploy:
+    name: Deploy to VM
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/app
+
+            # Login to Yandex Container Registry
+            echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login cr.yandex --username json_key --password-stdin
+
+            # Pull latest image
+            docker pull cr.yandex/${{ secrets.YC_REGISTRY_ID }}/mood-classifier:latest
+
+            # Export env vars and restart
+            export YC_REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
+            export TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            export ADMIN_USER_ID=${{ secrets.ADMIN_USER_ID }}
+
+            # Stop old container, start new
+            docker compose down || true
+            docker compose up -d
+
+            # Cleanup
+            docker logout cr.yandex
+            docker image prune -af
+
+            # Show status
+            docker ps
