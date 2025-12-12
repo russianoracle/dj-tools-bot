@@ -24,6 +24,7 @@ from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
 
 # Configure logging
 logging.basicConfig(
@@ -38,7 +39,7 @@ ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "500"))
 
 # Initialize bot and dispatcher
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 router = Router()
 
