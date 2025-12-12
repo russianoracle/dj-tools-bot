@@ -21,8 +21,10 @@ RUN pip install --no-cache-dir -r requirements-bot.txt \
 
 # Copy application code (changes most frequently - last layer)
 COPY --chown=appuser:appuser src/services/ ./src/services/
-COPY --chown=appuser:appuser src/__init__.py ./src/
 COPY --chown=appuser:appuser config/ ./config/
+
+# Create minimal __init__.py for bot-only build
+RUN echo '"""DJ Tools Bot Service."""' > ./src/__init__.py && chown appuser:appuser ./src/__init__.py
 
 # Switch to non-root user
 USER appuser
