@@ -39,7 +39,7 @@ RUN useradd -m -u 1000 appuser && \
 # Copy application code
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser config/ ./config/
-COPY --chown=appuser:appuser models/production/ ./models/production/
+COPY --chown=appuser:appuser main.py ./
 
 # Switch to non-root user
 USER appuser
