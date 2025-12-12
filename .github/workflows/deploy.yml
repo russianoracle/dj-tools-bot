@@ -81,7 +81,26 @@ jobs:
             -e ADMIN_USER_ID=123 \
             dj-tools-bot:test
           sleep 5
-          docker logs test-bot 2>&1 | head -20
+
+          # Check container is still running (not restarting due to errors)
+          STATUS=$(docker inspect -f '{{.State.Status}}' test-bot)
+          echo "Container status: $STATUS"
+
+          # Show logs
+          docker logs test-bot 2>&1 | head -30
+
+          # Fail if container crashed or is restarting
+          if [ "$STATUS" != "running" ]; then
+            echo "ERROR: Container is not running (status: $STATUS)"
+            exit 1
+          fi
+
+          # Check for Python errors in logs
+          if docker logs test-bot 2>&1 | grep -q "ModuleNotFoundError\|ImportError\|SyntaxError"; then
+            echo "ERROR: Python errors found in container logs"
+            exit 1
+          fi
+
           docker stop test-bot
 
       - name: Cleanup
