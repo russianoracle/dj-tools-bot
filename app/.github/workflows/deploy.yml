@@ -191,36 +191,42 @@ jobs:
             pytest tests/test_ci_pipelines.py::TestSetAnalysisPipeline -vv --tb=short
 
   # =============================================================================
-  # STAGE 6: Build Production Image & Push (после успешных тестов)
+  # STAGE 6: Push Production Image (REUSE test image, no rebuild!)
   # =============================================================================
-  build-production:
-    name: Build & Push Production
+  push-production:
+    name: Push Production
     runs-on: ubuntu-latest
     needs: [security, test-unit, test-integration-redis, test-pipelines]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Download Docker image (from tests)
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: |
+          docker load < /tmp/image.tar.gz
+          docker images
 
       - name: Login to Yandex Container Registry
         run: |
           echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Build and push production image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
+      - name: Tag and push to registry
+        run: |
+          # Retag test image for production
+          docker tag ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
+
+          # Push both tags
+          docker push ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Logout from registry
         if: always()
@@ -232,7 +238,7 @@ jobs:
   cleanup-registry:
     name: Cleanup Old Images
     runs-on: ubuntu-latest
-    needs: build-production
+    needs: push-production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Install yc CLI
@@ -264,7 +270,7 @@ jobs:
   deploy:
     name: Deploy to VM
     runs-on: ubuntu-latest
-    needs: build-production
+    needs: push-production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Deploy via SSH
