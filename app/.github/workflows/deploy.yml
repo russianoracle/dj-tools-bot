@@ -32,29 +32,25 @@ jobs:
           echo "tags=test-${{ github.sha }}" >> $GITHUB_OUTPUT
           echo "Image will be tagged as: test-${{ github.sha }}"
 
-      - name: Build Docker image (with BuildKit cache)
+      - name: Login to Yandex Container Registry
+        run: |
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+
+      - name: Build and push test image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: false
-          load: true
-          tags: ${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
-      - name: Save Docker image to tarball
-        run: |
-          docker save ${{ env.IMAGE_NAME }}:test-${{ github.sha }} | gzip > /tmp/image.tar.gz
-
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp/image.tar.gz
-          retention-days: 1
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
   # STAGE 2: Security Scan (параллельно с build)
@@ -82,23 +78,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
+      - name: Login to registry
+        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Load Docker image
-        run: |
-          docker load < /tmp/image.tar.gz
-          docker images
+      - name: Pull test image
+        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
 
       - name: Run unit tests in container
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             pytest tests/ -m "unit" -vv --tb=short || true
+
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
   # STAGE 4: Integration Tests с Redis (использует Docker image)
@@ -121,15 +116,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
+      - name: Login to registry
+        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Load Docker image
-        run: |
-          docker load < /tmp/image.tar.gz
+      - name: Pull test image
+        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
 
       - name: Run bot component tests
         run: |
@@ -137,7 +128,7 @@ jobs:
             --network host \
             -e REDIS_URL=redis://localhost:6379/0 \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             pytest tests/test_ci_bot.py -vv --tb=short
 
       - name: Run Redis cache integration tests
@@ -146,8 +137,12 @@ jobs:
             --network host \
             -e REDIS_URL=redis://localhost:6379/0 \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             pytest tests/test_ci_cache_redis.py -vv --tb=short
+
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
   # STAGE 5: Pipeline Tests (использует Docker image)
@@ -159,15 +154,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
+      - name: Login to registry
+        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Load Docker image
-        run: |
-          docker load < /tmp/image.tar.gz
+      - name: Pull test image
+        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
 
       - name: Verify test audio files exist
         run: |
@@ -180,55 +171,48 @@ jobs:
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             pytest tests/test_ci_pipelines.py::TestTrackAnalysisPipeline -vv --tb=short
 
       - name: Run SetAnalysisPipeline tests
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             pytest tests/test_ci_pipelines.py::TestSetAnalysisPipeline -vv --tb=short
+
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
   # STAGE 6: Push Production Image (REUSE test image, no rebuild!)
   # =============================================================================
   push-production:
-    name: Push Production
+    name: Tag Production
     runs-on: ubuntu-latest
     needs: [security, test-unit, test-integration-redis, test-pipelines]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - name: Login to registry
+        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Download Docker image (from tests)
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
+      - name: Pull test image
+        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
 
-      - name: Load Docker image
+      - name: Tag as production
         run: |
-          docker load < /tmp/image.tar.gz
-          docker images
-
-      - name: Login to Yandex Container Registry
-        run: |
-          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
-
-      - name: Tag and push to registry
-        run: |
-          # Retag test image for production
-          docker tag ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+          docker tag ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker tag ${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+          docker tag ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
-          # Push both tags
+      - name: Push production tags
+        run: |
           docker push ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker push ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Logout from registry
+      - name: Logout
         if: always()
         run: docker logout ${{ env.REGISTRY }}
 
