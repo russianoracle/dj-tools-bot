@@ -74,7 +74,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-prod.txt
           pip install pytest pytest-asyncio
 
       - name: Run unit tests
@@ -118,7 +118,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-prod.txt
           pip install pytest pytest-asyncio redis
 
       - name: Verify Redis connection
@@ -174,7 +174,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-prod.txt
           pip install pytest
 
       - name: Verify test audio files exist

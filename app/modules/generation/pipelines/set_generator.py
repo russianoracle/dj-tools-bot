@@ -500,7 +500,10 @@ def load_rekordbox_tracks(require_local_file: bool = False) -> List[RekordboxTra
         return tracks
 
     except ImportError:
-        logger.warning("pyrekordbox not installed - using empty library")
+        logger.warning(
+            "pyrekordbox not installed - using empty library. "
+            "For training/development: pip install -r requirements-training.txt"
+        )
         return []
     except Exception as e:
         logger.error(f"Failed to load Rekordbox database: {e}")
