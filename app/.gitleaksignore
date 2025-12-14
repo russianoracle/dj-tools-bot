@@ -1,0 +1,3 @@
+# Rekordbox 6 public database key - same for all installations
+# See: https://github.com/dylanljones/pyrekordbox/discussions/97
+app/modules/generation/pipelines/set_generator.py:RB6_DB_KEY
