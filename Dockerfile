@@ -64,7 +64,7 @@ COPY --chown=appuser:appuser app/ ./app/
 
 # Копируем production models (если есть)
 RUN mkdir -p ./models/production
-COPY --chown=appuser:appuser models/production/ ./models/production/ 2>/dev/null || true
+COPY --chown=appuser:appuser models/production/ ./models/production/
 
 # Switch to non-root
 USER appuser
