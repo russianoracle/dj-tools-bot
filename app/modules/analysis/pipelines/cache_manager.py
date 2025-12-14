@@ -182,6 +182,27 @@ class CacheManager:
             )
         ''')
 
+        # NEW: Track metadata table (Rekordbox metadata cache)
+        # Stores ONLY metadata needed for set generation (no audio analysis)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS track_metadata (
+                file_path TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                artist TEXT NOT NULL,
+                bpm REAL,
+                key TEXT,
+                duration_sec REAL,
+                rating INTEGER DEFAULT 0,
+                play_count INTEGER DEFAULT 0,
+                genre TEXT DEFAULT '',
+                label TEXT DEFAULT '',
+                year INTEGER DEFAULT 0,
+                source TEXT NOT NULL,
+                created_at REAL,
+                updated_at REAL
+            )
+        ''')
+
         # Create indexes
         cursor.execute(
             'CREATE INDEX IF NOT EXISTS idx_set_plans_dj ON set_plans(dj_name)'
@@ -197,6 +218,15 @@ class CacheManager:
         )
         cursor.execute(
             'CREATE INDEX IF NOT EXISTS idx_track_path_index_hash ON track_path_index(file_hash)'
+        )
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_track_metadata_artist ON track_metadata(artist)'
+        )
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_track_metadata_genre ON track_metadata(genre)'
+        )
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_track_metadata_bpm ON track_metadata(bpm)'
         )
 
         conn.commit()
@@ -1544,3 +1574,232 @@ class CacheManager:
             }
         except Exception:
             return {'total_plans': 0}
+
+    # ============== Track Metadata Cache (Rekordbox) ==============
+    # Metadata-only cache for set generation (no audio analysis required)
+
+    def get_all_track_metadata(
+        self,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all cached track metadata with optional filtering.
+
+        Args:
+            filters: Optional dict with keys: min_bpm, max_bpm, genres, artists, min_rating
+            limit: Maximum number of tracks to return
+
+        Returns:
+            List of track metadata dicts
+        """
+        if not self.enable_predictions:
+            return []
+
+        try:
+            conn = sqlite3.connect(str(self.predictions_db))
+            cursor = conn.cursor()
+
+            query = 'SELECT * FROM track_metadata WHERE 1=1'
+            params = []
+
+            if filters:
+                if 'min_bpm' in filters:
+                    query += ' AND bpm >= ?'
+                    params.append(filters['min_bpm'])
+                if 'max_bpm' in filters:
+                    query += ' AND bpm <= ?'
+                    params.append(filters['max_bpm'])
+                if 'genres' in filters and filters['genres']:
+                    placeholders = ','.join('?' * len(filters['genres']))
+                    query += f' AND genre IN ({placeholders})'
+                    params.extend(filters['genres'])
+                if 'artists' in filters and filters['artists']:
+                    placeholders = ','.join('?' * len(filters['artists']))
+                    query += f' AND artist IN ({placeholders})'
+                    params.extend(filters['artists'])
+                if 'min_rating' in filters:
+                    query += ' AND rating >= ?'
+                    params.append(filters['min_rating'])
+
+            query += ' ORDER BY artist, title'
+
+            if limit:
+                query += ' LIMIT ?'
+                params.append(limit)
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            conn.close()
+
+            # Convert to dict (column names match RekordboxTrack fields)
+            return [
+                {
+                    'file_path': row[0],
+                    'title': row[1],
+                    'artist': row[2],
+                    'bpm': row[3],
+                    'key': row[4],
+                    'duration_sec': row[5],
+                    'rating': row[6],
+                    'play_count': row[7],
+                    'genre': row[8],
+                    'label': row[9],
+                    'year': row[10],
+                    'source': row[11],
+                }
+                for row in rows
+            ]
+        except Exception:
+            return []
+
+    def save_track_metadata(self, track: Dict[str, Any]):
+        """
+        Save single track metadata to cache.
+
+        Args:
+            track: Dict with keys: file_path, title, artist, bpm, key, duration_sec,
+                   rating, play_count, genre, label, year, source
+        """
+        if not self.enable_predictions:
+            return
+
+        try:
+            conn = sqlite3.connect(str(self.predictions_db))
+            cursor = conn.cursor()
+
+            now = time.time()
+            cursor.execute('''
+                INSERT OR REPLACE INTO track_metadata
+                (file_path, title, artist, bpm, key, duration_sec, rating, play_count,
+                 genre, label, year, source, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                        COALESCE((SELECT created_at FROM track_metadata WHERE file_path = ?), ?), ?)
+            ''', (
+                track['file_path'],
+                track['title'],
+                track['artist'],
+                track.get('bpm', 0.0),
+                track.get('key', ''),
+                track.get('duration_sec', 0.0),
+                track.get('rating', 0),
+                track.get('play_count', 0),
+                track.get('genre', ''),
+                track.get('label', ''),
+                track.get('year', 0),
+                track.get('source', 'rekordbox'),
+                track['file_path'],
+                now,
+                now
+            ))
+
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    def save_track_metadata_batch(self, tracks: List[Dict[str, Any]]):
+        """
+        Save multiple track metadata to cache (batch operation).
+
+        Args:
+            tracks: List of track dicts
+        """
+        if not self.enable_predictions:
+            return
+
+        try:
+            conn = sqlite3.connect(str(self.predictions_db))
+            cursor = conn.cursor()
+
+            now = time.time()
+            cursor.execute('BEGIN')
+
+            for track in tracks:
+                try:
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO track_metadata
+                        (file_path, title, artist, bpm, key, duration_sec, rating, play_count,
+                         genre, label, year, source, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                                COALESCE((SELECT created_at FROM track_metadata WHERE file_path = ?), ?), ?)
+                    ''', (
+                        track['file_path'],
+                        track['title'],
+                        track['artist'],
+                        track.get('bpm', 0.0),
+                        track.get('key', ''),
+                        track.get('duration_sec', 0.0),
+                        track.get('rating', 0),
+                        track.get('play_count', 0),
+                        track.get('genre', ''),
+                        track.get('label', ''),
+                        track.get('year', 0),
+                        track.get('source', 'rekordbox'),
+                        track['file_path'],
+                        now,
+                        now
+                    ))
+                except Exception:
+                    continue  # Skip bad tracks
+
+            cursor.execute('COMMIT')
+            conn.close()
+        except Exception:
+            pass
+
+    def clear_track_metadata(self, source: Optional[str] = None):
+        """
+        Clear track metadata cache.
+
+        Args:
+            source: If provided, only clear tracks from this source (e.g., 'rekordbox')
+        """
+        if not self.enable_predictions:
+            return
+
+        try:
+            conn = sqlite3.connect(str(self.predictions_db))
+            cursor = conn.cursor()
+
+            if source:
+                cursor.execute('DELETE FROM track_metadata WHERE source = ?', (source,))
+            else:
+                cursor.execute('DELETE FROM track_metadata')
+
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    def get_track_metadata_stats(self) -> Dict[str, Any]:
+        """Get track metadata cache statistics."""
+        if not self.enable_predictions:
+            return {'total_tracks': 0}
+
+        try:
+            conn = sqlite3.connect(str(self.predictions_db))
+            cursor = conn.cursor()
+
+            cursor.execute('SELECT COUNT(*) FROM track_metadata')
+            total = cursor.fetchone()[0]
+
+            cursor.execute('SELECT COUNT(DISTINCT artist) FROM track_metadata')
+            unique_artists = cursor.fetchone()[0]
+
+            cursor.execute('SELECT COUNT(DISTINCT genre) FROM track_metadata WHERE genre != ""')
+            unique_genres = cursor.fetchone()[0]
+
+            cursor.execute('SELECT source, COUNT(*) FROM track_metadata GROUP BY source')
+            by_source = dict(cursor.fetchall())
+
+            conn.close()
+
+            return {
+                'total_tracks': total,
+                'unique_artists': unique_artists,
+                'unique_genres': unique_genres,
+                'by_source': by_source,
+            }
+        except Exception:
+            return {'total_tracks': 0}

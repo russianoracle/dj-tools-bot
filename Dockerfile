@@ -26,8 +26,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 COPY requirements-prod.txt .
 
 # Собираем wheels с кэшем pip (BuildKit cache mount)
+# ВАЖНО: --only-binary :all: ЗАПРЕЩАЕТ компиляцию, только готовые wheels!
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --no-cache-dir --wheel-dir /wheels -r requirements-prod.txt
+    pip install --upgrade pip wheel && \
+    pip wheel --no-cache-dir --only-binary :all: --wheel-dir /wheels -r requirements-prod.txt || \
+    pip wheel --no-cache-dir --prefer-binary --wheel-dir /wheels -r requirements-prod.txt
 
 # ============================================================================
 # STAGE 2: Runtime Image (final minimal image)
@@ -50,7 +53,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Копируем wheels из builder и устанавливаем (один слой)
 COPY --from=builder /wheels /wheels
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir --no-deps /wheels/* \
+    pip install --upgrade pip && \
+    pip install --no-cache-dir /wheels/* \
     && rm -rf /wheels
 
 # Создаём non-root user (security best practice)

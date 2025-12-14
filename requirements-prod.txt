@@ -27,8 +27,8 @@ mutagen>=1.47.0
 pyyaml>=6.0
 tqdm>=4.65.0
 
-# Performance
-numba>=0.57.0  # JIT compilation для librosa
+# Performance (REMOVED - optional, slow to compile)
+# numba>=0.57.0  # JIT compilation для librosa (опционально, +2min build time)
 
 # Telegram Bot
 aiogram>=3.0.0
