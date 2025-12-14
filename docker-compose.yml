@@ -18,7 +18,8 @@ services:
       - cache_data:/app/cache
       - downloads_data:/app/downloads
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - app-network
     deploy:
@@ -27,58 +28,50 @@ services:
           memory: 4G
         reservations:
           memory: 2G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import redis; r = redis.from_url('redis://redis:6379/0'); r.ping()"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   worker:
     build: .
     image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID}/mood-classifier:${TAG:-latest}
     container_name: mood-classifier-worker
-    command: celery -A src.services.celery_app worker --loglevel=info --concurrency=2
+    command: arq app.services.arq_worker.WorkerSettings
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
       - CACHE_DIR=/app/cache
       - DOWNLOADS_DIR=/app/downloads
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - cache_data:/app/cache
       - downloads_data:/app/downloads
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - app-network
     deploy:
       resources:
         limits:
-          memory: 8G
+          memory: 6G
         reservations:
-          memory: 4G
-
-  api:
-    build: .
-    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID}/mood-classifier:${TAG:-latest}
-    container_name: mood-classifier-api
-    command: uvicorn src.services.api:app --host 0.0.0.0 --port 8000
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - CACHE_DIR=/app/cache
-    volumes:
-      - cache_data:/app/cache
-    depends_on:
-      - redis
-    networks:
-      - app-network
+          memory: 3G
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "from arq.connections import ArqRedis; import asyncio; asyncio.run(ArqRedis.from_url('redis://redis:6379').ping())"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 15s
 
   redis:
     image: redis:7-alpine
     container_name: mood-classifier-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     networks:
@@ -88,20 +81,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # Optional: Flower for Celery monitoring
-  flower:
-    image: mher/flower:2.0
-    container_name: mood-classifier-flower
-    command: celery --broker=redis://redis:6379/0 flower --port=5555
-    ports:
-      - "5555:5555"
-    depends_on:
-      - redis
-    networks:
-      - app-network
-    profiles:
-      - monitoring
+      start_period: 5s
 
 volumes:
   cache_data:

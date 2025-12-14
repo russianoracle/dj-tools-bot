@@ -12,6 +12,9 @@ env:
   PYTHON_VERSION: "3.12"
 
 jobs:
+  # =============================================================================
+  # STAGE 1: Lint (параллельно с Security)
+  # =============================================================================
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -27,12 +30,15 @@ jobs:
         run: pip install ruff
 
       - name: Run ruff (warnings only)
-        run: ruff check src/ --ignore=E501,F401,F541 || true
+        run: ruff check app/ --ignore=E501,F401,F541 || true
 
       - name: Cleanup
         if: always()
         run: rm -rf ~/.cache/pip
 
+  # =============================================================================
+  # STAGE 2: Security (параллельно с Lint)
+  # =============================================================================
   security:
     name: Security
     runs-on: ubuntu-latest
@@ -50,10 +56,13 @@ jobs:
         if: always()
         run: rm -rf .git
 
-  test:
-    name: Tests
+  # =============================================================================
+  # STAGE 3: Unit Tests (после Lint)
+  # =============================================================================
+  test-unit:
+    name: Unit Tests
     runs-on: ubuntu-latest
-    needs: lint
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -65,47 +74,149 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements-bot.txt
-          pip install pytest
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
 
       - name: Run unit tests
-        run: pytest tests/ -v --tb=short || true
-
-      - name: Build Docker image
-        run: docker build -t dj-tools-bot:test .
-
-      - name: Test container starts
         run: |
-          docker run -d --name test-bot \
-            -e TELEGRAM_BOT_TOKEN=test_token \
-            -e ADMIN_USER_ID=123 \
-            dj-tools-bot:test
-          sleep 3
-
-          # Show logs
-          docker logs test-bot 2>&1 | head -30
-
-          # Check for Python import errors (critical - means broken build)
-          if docker logs test-bot 2>&1 | grep -q "ModuleNotFoundError\|ImportError\|SyntaxError"; then
-            echo "ERROR: Python import errors found in container logs"
-            exit 1
-          fi
-
-          # Token validation error is expected with test_token - that's OK
-          echo "Container started successfully (token validation error expected)"
-          docker stop test-bot 2>/dev/null || true
+          echo "=== Running Unit Tests ==="
+          pytest tests/ -m "unit" -vv --tb=long -s 2>&1 | tee unit-tests.log || true
+          echo "=== Unit Tests Summary ==="
+          tail -50 unit-tests.log
 
       - name: Cleanup
         if: always()
-        run: |
-          docker rm -f test-bot 2>/dev/null || true
-          docker rmi dj-tools-bot:test 2>/dev/null || true
-          rm -rf ~/.cache/pip __pycache__ .pytest_cache
+        run: rm -rf ~/.cache/pip __pycache__ .pytest_cache
 
+  # =============================================================================
+  # STAGE 4: Integration Tests с Redis service
+  # =============================================================================
+  test-integration-redis:
+    name: Integration Tests (Redis)
+    runs-on: ubuntu-latest
+    needs: [test-unit]
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    env:
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio redis
+
+      - name: Verify Redis connection
+        run: |
+          echo "=== Testing Redis Connection ==="
+          python -c "import redis; r = redis.Redis(host='localhost', port=6379); print('✓ Redis PING:', r.ping())"
+          echo "=== Redis Info ==="
+          python -c "import redis; r = redis.Redis(host='localhost', port=6379); print(r.info('server')['redis_version'])"
+
+      - name: Run bot component tests
+        run: |
+          echo "=== Running Bot Component Tests ==="
+          pytest tests/test_ci_bot.py -vv --tb=long -s 2>&1 | tee bot-tests.log
+          echo ""
+          echo "=== Bot Tests Summary ==="
+          grep -E "PASSED|FAILED|ERROR" bot-tests.log || true
+          tail -20 bot-tests.log
+
+      - name: Run Redis cache integration tests
+        run: |
+          echo "=== Running Redis Cache Integration Tests ==="
+          pytest tests/test_ci_cache_redis.py -vv --tb=long -s 2>&1 | tee redis-tests.log
+          echo ""
+          echo "=== Redis Tests Summary ==="
+          tail -30 redis-tests.log
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf ~/.cache/pip __pycache__ .pytest_cache
+
+  # =============================================================================
+  # STAGE 5: Pipeline Tests с реальным аудио
+  # =============================================================================
+  test-pipelines:
+    name: Pipeline Tests (Real Audio)
+    runs-on: ubuntu-latest
+    needs: [test-unit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies (audio processing)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libsndfile1 \
+            ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Verify test audio files exist
+        run: |
+          echo "=== Checking Test Audio Files ==="
+          ls -lh tests/fixtures/audio/
+          echo ""
+          echo "✓ Checking track_sample_30s.flac..."
+          test -f tests/fixtures/audio/track_sample_30s.flac || exit 1
+          echo "✓ Checking set_sample_30s.m4a..."
+          test -f tests/fixtures/audio/set_sample_30s.m4a || exit 1
+          echo "✓ All test files present"
+
+      - name: Run TrackAnalysisPipeline tests
+        run: |
+          echo "=== Running TrackAnalysisPipeline Tests ==="
+          pytest tests/test_ci_pipelines.py::TestTrackAnalysisPipeline -vv --tb=long -s 2>&1 | tee track-tests.log
+          echo ""
+          echo "=== Track Analysis Summary ==="
+          grep -E "PASSED|FAILED|ERROR|Performance:" track-tests.log || true
+          tail -20 track-tests.log
+
+      - name: Run SetAnalysisPipeline tests
+        run: |
+          echo "=== Running SetAnalysisPipeline Tests ==="
+          pytest tests/test_ci_pipelines.py::TestSetAnalysisPipeline -vv --tb=long -s 2>&1 | tee set-tests.log
+          echo ""
+          echo "=== Set Analysis Summary ==="
+          grep -E "PASSED|FAILED|ERROR|Performance:" set-tests.log || true
+          tail -20 set-tests.log
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf ~/.cache/pip __pycache__ .pytest_cache
+
+  # =============================================================================
+  # STAGE 6: Build & Push (после успешных тестов)
+  # =============================================================================
   build:
     name: Build & Push
     runs-on: ubuntu-latest
-    needs: [lint, security, test]
+    needs: [security, test-integration-redis, test-pipelines]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
@@ -141,6 +252,9 @@ jobs:
           docker system prune -af
           rm -rf ~/.docker/config.json
 
+  # =============================================================================
+  # STAGE 7: Cleanup Old Images в Registry
+  # =============================================================================
   cleanup-registry:
     name: Cleanup Old Images
     runs-on: ubuntu-latest
@@ -170,6 +284,9 @@ jobs:
         if: always()
         run: rm -f /tmp/sa-key.json
 
+  # =============================================================================
+  # STAGE 8: Deploy на VM
+  # =============================================================================
   deploy:
     name: Deploy to VM
     runs-on: ubuntu-latest
@@ -202,9 +319,9 @@ jobs:
             export TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
             export ADMIN_USER_ID=$ADMIN_USER_ID
 
-            # Stop old container, start new (using docker-compose v1 syntax)
-            docker-compose down || true
-            docker-compose up -d
+            # Stop old containers, start new
+            docker compose down || docker-compose down || true
+            docker compose up -d || docker-compose up -d
 
             # Cleanup
             docker logout cr.yandex
@@ -212,4 +329,4 @@ jobs:
 
             # Show status
             docker ps
-            docker logs dj-tools-bot --tail 10 2>&1 || true
+            docker logs mood-classifier-bot --tail 20 2>&1 || docker logs dj-tools-bot --tail 20 2>&1 || true

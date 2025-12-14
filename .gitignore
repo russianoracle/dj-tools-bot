@@ -1,56 +1,31 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 *.so
-*.egg
-*.egg-info/
-dist/
-build/
-.eggs/
 
-# Virtual environments
+# Environment
+.env
+.env.*
+!.env.example
 venv/
 .venv/
-env/
+
+# Cache and data
+cache/
+data/
+downloads/
+*.log
 
 # IDE
+.DS_Store
 .idea/
 .vscode/
-*.swp
-*.swo
 
-# Env files
-.env
-*.env.local
+# Training and development (should never be in deploy repo)
+training/
+scripts/
+experiments/
 
-# Cache
-/cache/
-*.db
-
-# Terraform
-terraform/
-*.tfstate
-*.tfstate.*
-.terraform/
-
-# Models (large files)
-models/
-*.pkl
-*.h5
-*.pt
-*.onnx
-
-# Data
-data/
-*.mp3
-*.wav
-*.flac
-*.m4a
-
-# Logs
-*.log
-logs/
-
-# OS
-.DS_Store
-Thumbs.db
+# NOTE: tests/ is INCLUDED for CI/CD integration tests
+# Only test_ci_*.py files are copied, not the full test suite
