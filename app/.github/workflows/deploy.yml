@@ -78,7 +78,15 @@ jobs:
       - name: Pull base image for cache
         run: |
           BASE_IMAGE="${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}"
+
+          echo "🔄 Pulling latest base image: $BASE_IMAGE"
           docker pull "$BASE_IMAGE" 2>/dev/null || echo "⚠️ Base image pull failed, will build from scratch"
+
+          # Show base image creation date to verify freshness
+          if docker image inspect "$BASE_IMAGE" >/dev/null 2>&1; then
+            CREATED=$(docker inspect "$BASE_IMAGE" --format='{{.Created}}')
+            echo "📅 Base image created: $CREATED"
+          fi
 
       - name: Build test stage (includes app + test deps)
         run: |
