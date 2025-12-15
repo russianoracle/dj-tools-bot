@@ -38,11 +38,12 @@ jobs:
           docker buildx inspect --bootstrap
 
   # ============================================
-  # JOB 2: Security Scan
+  # JOB 2: Security Scan (parallel with build-and-test)
   # ============================================
   security:
     name: Security Scan
     runs-on: self-hosted
+    # Run in parallel with build-and-test, no dependencies
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,13 +68,12 @@ jobs:
           echo "✅ Security scan completed"
 
   # ============================================
-  # JOB 3: Build & Test (LOCAL ONLY, NO PUSH)
+  # JOB 3: Build Test Image (ONCE, shared by all test jobs)
   # ============================================
-  build-and-test:
-    name: Build & Test
+  build-test-image:
+    name: Build Test Image
     runs-on: self-hosted
     needs: [setup-builder]
-    # Security scan is optional - don't block build if it fails
     steps:
       - uses: actions/checkout@v4
 
@@ -119,48 +119,60 @@ jobs:
           echo "✓ Test image built and loaded to Docker daemon"
           docker images | grep mood-classifier
 
-      - name: Run unit tests
-        run: |
-          docker run --rm \
-            -v $(pwd)/tests:/app/tests \
-            mood-classifier:test-${{ github.sha }} \
-            pytest tests/ -m "unit" -vv --tb=short
-
-      - name: Start Redis for integration tests
-        run: |
-          docker run -d --name test-redis -p 6379:6379 redis:7-alpine
-          sleep 2
-
-      - name: Run integration tests with Redis
-        run: |
-          docker run --rm \
-            -v $(pwd)/tests:/app/tests \
-            --network host \
-            mood-classifier:test-${{ github.sha }} \
-            pytest tests/ -m "integration" -vv --tb=short
-
-      - name: Run analysis tests (real audio)
-        run: |
-          docker run --rm \
-            -v $(pwd)/tests:/app/tests \
-            mood-classifier:test-${{ github.sha }} \
-            pytest tests/ -m "analysis" -vv --tb=short
-
-      - name: Cleanup Redis
-        if: always()
-        run: docker rm -f test-redis || true
-
       - name: Logout from registry
         if: always()
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 4: Build & Push Production (AFTER TESTS)
+  # JOB 4: Run Tests in Parallel (matrix strategy)
+  # ============================================
+  test:
+    name: Test (${{ matrix.test-type }})
+    runs-on: self-hosted
+    needs: [build-test-image]
+    strategy:
+      fail-fast: false  # Continue all tests even if one fails
+      matrix:
+        test-type: [unit, integration, analysis]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Redis (integration tests only)
+        if: matrix.test-type == 'integration'
+        run: |
+          docker run -d --name test-redis-${{ github.sha }} -p 6379:6379 redis:7-alpine
+          sleep 2
+
+      - name: Run ${{ matrix.test-type }} tests
+        run: |
+          echo "🧪 Running ${{ matrix.test-type }} tests..."
+
+          if [ "${{ matrix.test-type }}" = "integration" ]; then
+            # Integration tests need Redis access
+            docker run --rm \
+              -v $(pwd)/tests:/app/tests \
+              --network host \
+              mood-classifier:test-${{ github.sha }} \
+              pytest tests/ -m "${{ matrix.test-type }}" -vv --tb=short
+          else
+            # Unit and analysis tests run isolated
+            docker run --rm \
+              -v $(pwd)/tests:/app/tests \
+              mood-classifier:test-${{ github.sha }} \
+              pytest tests/ -m "${{ matrix.test-type }}" -vv --tb=short
+          fi
+
+      - name: Cleanup Redis
+        if: always() && matrix.test-type == 'integration'
+        run: docker rm -f test-redis-${{ github.sha }} || true
+
+  # ============================================
+  # JOB 5: Build & Push Production (AFTER TESTS + SECURITY)
   # ============================================
   push-production:
     name: Push Production Image
     runs-on: self-hosted
-    needs: build-and-test
+    needs: [test, security]  # Wait for ALL tests (matrix) AND security
     if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
@@ -195,7 +207,7 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 5: Deploy to Production (Local)
+  # JOB 6: Deploy to Production (Local)
   # ============================================
   deploy:
     name: Deploy Locally
@@ -256,7 +268,7 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 6: Cleanup Local Cache
+  # JOB 7: Cleanup Local Cache
   # ============================================
   cleanup:
     name: Cleanup Local Cache
@@ -293,7 +305,7 @@ jobs:
           fi
 
   # ============================================
-  # JOB 7: Cleanup Old Registry Images
+  # JOB 8: Cleanup Old Registry Images
   # ============================================
   cleanup-registry:
     name: Cleanup Registry
