@@ -162,30 +162,29 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 5: Deploy to VM
+  # JOB 5: Deploy (same machine as runner)
   # ============================================
   deploy:
     name: Deploy
     runs-on: self-hosted
     needs: push
     steps:
-      - name: Deploy to production
+      - name: Deploy production container
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@158.160.122.216 << 'EOF'
-            echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
-            docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-            docker stop mood-classifier 2>/dev/null || true
-            docker rm mood-classifier 2>/dev/null || true
-            docker run -d \
-              --name mood-classifier \
-              --restart unless-stopped \
-              -v /data:/data \
-              -e DATA_DIR=/data \
-              ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-            sleep 5
-            docker ps | grep mood-classifier
-            echo "✓ Deployed"
-          EOF
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+          docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
+          docker stop mood-classifier 2>/dev/null || true
+          docker rm mood-classifier 2>/dev/null || true
+          docker run -d \
+            --name mood-classifier \
+            --restart unless-stopped \
+            -v /data:/data \
+            -e DATA_DIR=/data \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
+          sleep 3
+          docker ps | grep mood-classifier
+          docker logout ${{ env.REGISTRY }}
+          echo "✓ Deployed"
 
   # ============================================
   # JOB 6: Cleanup
