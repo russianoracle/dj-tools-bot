@@ -54,10 +54,10 @@ jobs:
           GITLEAKS_ENABLE_SUMMARY: false
 
   # ============================================
-  # JOB 3: Build & Test
+  # JOB 3: Build Test Image
   # ============================================
-  build-and-test:
-    name: Build & Test
+  build:
+    name: Build Test Image
     runs-on: self-hosted
     needs: [setup-builder, security]
     steps:
@@ -97,13 +97,27 @@ jobs:
           echo "✓ Test image built and loaded to Docker daemon"
           docker images | grep mood-classifier
 
-      - name: Start Redis for integration tests
+      - name: Logout from registry
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
+
+  # ============================================
+  # JOB 4a: Integration Tests (runner 1)
+  # ============================================
+  test-integration:
+    name: Integration Tests
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Redis
         run: |
-          docker rm -f test-redis 2>/dev/null || true
-          docker run -d --name test-redis -p 6379:6379 redis:7-alpine
+          docker rm -f test-redis-integration 2>/dev/null || true
+          docker run -d --name test-redis-integration -p 6379:6379 redis:7-alpine
           sleep 2
 
-      - name: Run integration tests (first, always)
+      - name: Run integration and pipeline tests
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
@@ -113,9 +127,22 @@ jobs:
             mood-classifier:test-${{ github.sha }} \
             pytest tests/ -m "integration or pipeline" -vv --tb=short
 
-      - name: Run unit and container tests (parallel background)
+      - name: Cleanup Redis
+        if: always()
+        run: docker rm -f test-redis-integration || true
+
+  # ============================================
+  # JOB 4b: Unit Tests (runner 2, parallel)
+  # ============================================
+  test-unit:
+    name: Unit Tests
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit and container tests
         run: |
-          # Run unit tests in background
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
             -e DATA_DIR=/data \
@@ -123,21 +150,13 @@ jobs:
             mood-classifier:test-${{ github.sha }} \
             pytest tests/ -m "unit or container" -vv --tb=short
 
-      - name: Cleanup Redis
-        if: always()
-        run: docker rm -f test-redis || true
-
-      - name: Logout from registry
-        if: always()
-        run: docker logout ${{ env.REGISTRY }}
-
   # ============================================
-  # JOB 4: Build & Push Production (AFTER TESTS)
+  # JOB 5: Build & Push Production (AFTER TESTS)
   # ============================================
   push-production:
     name: Push Production Image
     runs-on: self-hosted
-    needs: build-and-test
+    needs: [test-integration, test-unit]
     if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
