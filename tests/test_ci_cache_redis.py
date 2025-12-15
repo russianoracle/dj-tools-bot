@@ -56,7 +56,6 @@ class TestRedisCacheBasics:
     """Базовые операции с Redis кешем."""
 
     @pytest.mark.asyncio
-    @pytest.mark.asyncio
     async def test_redis_connection(self, redis_client):
         """Тест подключения к Redis.
 
@@ -81,7 +80,6 @@ class TestRedisCacheBasics:
         result = await redis_client.ping()
         assert result is True, "Redis должен отвечать True на ping()"
 
-    @pytest.mark.asyncio
     @pytest.mark.asyncio
     async def test_set_and_get(self, redis_client):
         """Тест базовых операций set/get.
