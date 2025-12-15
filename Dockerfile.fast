@@ -1,0 +1,67 @@
+# ============================================================================
+# Fast Dockerfile - использует pre-built base image
+# Build time: ~1-2 min (vs 7 min)
+# ============================================================================
+
+ARG PYTHON_VERSION=3.12
+ARG REGISTRY=cr.yandex
+ARG REGISTRY_ID=crp78hhr2t67jkeedad1
+
+# Используем pre-built base image с numpy, scipy, sklearn, pandas, numba, essentia
+FROM ${REGISTRY}/${REGISTRY_ID}/python-scientific:${PYTHON_VERSION} AS base
+
+# ============================================================================
+# STAGE 1: Install app-specific dependencies
+# ============================================================================
+FROM base AS builder
+
+WORKDIR /build
+
+# App-specific dependencies (БЕЗ тяжелых numpy/scipy/essentia - уже есть в base)
+COPY requirements-prod-app.txt .
+
+# Устанавливаем только app-specific пакеты (librosa, aiogram, xgboost, etc)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install --no-cache-dir --prefer-binary -r requirements-prod-app.txt
+
+# ============================================================================
+# STAGE 2: Runtime image
+# ============================================================================
+FROM base AS runtime
+
+WORKDIR /app
+
+# Копируем app-specific пакеты из builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Создаём non-root user
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/cache /app/downloads && \
+    chown -R appuser:appuser /app
+
+# Копируем код
+COPY --chown=appuser:appuser app/ ./app/
+
+# Копируем models
+RUN mkdir -p ./models/production
+COPY --chown=appuser:appuser models/production/ ./models/production/
+
+USER appuser
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import redis; r = redis.from_url('${REDIS_URL:-redis://redis:6379/0}'); r.ping()" || exit 1
+
+CMD ["python", "-m", "app.main"]
+
+# ============================================================================
+# Build Instructions:
+# ============================================================================
+# Requires: cr.yandex/YOUR_ID/python-scientific:3.12 already built
+# Build time: ~1-2 min (vs 7 min with full build)
+# ============================================================================
