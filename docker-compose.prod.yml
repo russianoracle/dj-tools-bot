@@ -20,12 +20,12 @@ services:
     restart: unless-stopped
     volumes:
       - mood-data:/data
+    env_file:
+      - .env
     environment:
       - DATA_DIR=/data
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID}
-      - YC_FOLDER_ID=${YC_FOLDER_ID}
     depends_on:
       redis:
         condition: service_healthy
@@ -62,10 +62,8 @@ services:
     image: cr.yandex/yc/fluent-bit-plugin-yandex:v1.0.4-fluent-bit-1.8.6
     container_name: fluent-bit
     restart: unless-stopped
-    environment:
-      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID}
-      - YC_FOLDER_ID=${YC_FOLDER_ID}
-      - YC_MESSAGE_QUEUE_URL=${YC_MESSAGE_QUEUE_URL:-}
+    env_file:
+      - .env
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
