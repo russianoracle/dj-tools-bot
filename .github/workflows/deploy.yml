@@ -72,6 +72,8 @@ jobs:
     runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check for secrets with Gitleaks
         uses: gitleaks/gitleaks-action@v2
