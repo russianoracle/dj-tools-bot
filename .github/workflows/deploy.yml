@@ -195,75 +195,62 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 5: Deploy to Production VM
+  # JOB 5: Deploy to Production (Local)
   # ============================================
   deploy:
-    name: Deploy to VM
+    name: Deploy Locally
     runs-on: self-hosted
     needs: push-production
     if: success()
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup SSH key
-        env:
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Prepare deployment directory
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H 158.160.122.216 >> ~/.ssh/known_hosts
+          sudo mkdir -p /opt/mood-classifier
+          sudo chown -R $USER:$USER /opt/mood-classifier
 
-      - name: Prepare deployment directory on VM
+      - name: Copy deployment files
         run: |
-          ssh -i ~/.ssh/deploy_key ubuntu@158.160.122.216 "mkdir -p /opt/mood-classifier"
+          cp docker-compose.prod.yml /opt/mood-classifier/
+          cp fluent-bit.conf /opt/mood-classifier/
 
-      - name: Copy deployment files to VM
+      - name: Deploy production stack
         run: |
-          scp -i ~/.ssh/deploy_key docker-compose.prod.yml ubuntu@158.160.122.216:/opt/mood-classifier/
-          scp -i ~/.ssh/deploy_key fluent-bit.conf ubuntu@158.160.122.216:/opt/mood-classifier/
+          echo "🚀 Deploying production stack locally"
+          cd /opt/mood-classifier
 
-      - name: Deploy to production VM
-        env:
-          YC_SA_KEY: ${{ secrets.YC_SA_JSON_KEY }}
-        run: |
-          echo "🚀 Deploying to production VM: 158.160.122.216"
+          # Login to registry
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-          ssh -i ~/.ssh/deploy_key ubuntu@158.160.122.216 << 'EOF'
-            cd /opt/mood-classifier || (mkdir -p /opt/mood-classifier && cd /opt/mood-classifier)
+          # Create volume if not exists
+          docker volume create mood-data 2>/dev/null || true
 
-            # Login to registry
-            echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+          # Stop and remove old containers
+          docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
 
-            # Create volume if not exists
-            docker volume create mood-data 2>/dev/null || true
+          # Pull latest image
+          REGISTRY=${{ env.REGISTRY }} \
+          REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
+          YC_LOG_GROUP_ID=${{ secrets.YC_LOG_GROUP_ID }} \
+          YC_FOLDER_ID=${{ secrets.YC_FOLDER_ID }} \
+          docker-compose -f docker-compose.prod.yml pull
 
-            # Stop and remove old containers
-            docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+          # Start services (app + redis + fluent-bit)
+          REGISTRY=${{ env.REGISTRY }} \
+          REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
+          YC_LOG_GROUP_ID=${{ secrets.YC_LOG_GROUP_ID }} \
+          YC_FOLDER_ID=${{ secrets.YC_FOLDER_ID }} \
+          docker-compose -f docker-compose.prod.yml up -d
 
-            # Pull latest image
-            REGISTRY=${{ env.REGISTRY }} \
-            REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
-            YC_LOG_GROUP_ID=${{ secrets.YC_LOG_GROUP_ID }} \
-            YC_FOLDER_ID=${{ secrets.YC_FOLDER_ID }} \
-            docker-compose -f docker-compose.prod.yml pull
+          # Verify deployment
+          sleep 5
+          docker-compose -f docker-compose.prod.yml ps
+          echo "✓ Deployment successful (app + redis + fluent-bit)"
 
-            # Start services
-            REGISTRY=${{ env.REGISTRY }} \
-            REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
-            YC_LOG_GROUP_ID=${{ secrets.YC_LOG_GROUP_ID }} \
-            YC_FOLDER_ID=${{ secrets.YC_FOLDER_ID }} \
-            docker-compose -f docker-compose.prod.yml up -d
-
-            # Verify deployment
-            sleep 5
-            docker-compose -f docker-compose.prod.yml ps
-            echo "✓ Deployment successful (app + fluent-bit for Yandex Cloud Logging)"
-          EOF
-
-      - name: Cleanup SSH key
+      - name: Logout from registry
         if: always()
-        run: rm -f ~/.ssh/deploy_key
+        run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
   # JOB 6: Cleanup Local Cache
