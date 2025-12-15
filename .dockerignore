@@ -6,7 +6,7 @@ training/
 scripts/
 data/
 experiments/
-tests/
+# tests/ - NEEDED for multi-stage build (test stage)
 docs/
 terraform/
 
