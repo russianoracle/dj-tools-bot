@@ -1,0 +1,75 @@
+# Artifact Registry - Single Source of Truth
+#
+# This file defines ALL datasets and their metadata.
+# Training scripts should ONLY load datasets through src/artifacts.py
+# which validates against this registry.
+
+# Current active dataset for training
+active_dataset: user_ultimate_v1
+
+# Dataset definitions
+datasets:
+  user_ultimate_v1:
+    description: "Primary dataset - 795 tracks extracted with GPU script"
+    status: active  # active | archived | experimental
+    frames_path: results/ultimate_features/frames.pkl
+    spectrograms_path: results/ultimate_features/spectrograms.pkl
+    track_features_path: results/ultimate_features/track_features.pkl
+    source_csv: results/user_tracks.csv
+    extractor_script: scripts/extract_ultimate_gpu.py
+    extraction_date: "2024-12-04"
+    expected_tracks: 821
+    expected_features: 90
+    zones:
+      YELLOW: 202
+      GREEN: 480
+      PURPLE: 113
+    notes: "Clean dataset, GPU-extracted with nnAudio/torchaudio"
+
+  serato_legacy_v1:
+    description: "Old Serato extraction with librosa (deprecated)"
+    status: archived
+    frames_path: results/serato_frames_m2.pkl
+    source_csv: results/serato_for_extract.csv
+    extractor_script: scripts/extract_features_m2.py  # OLD SCRIPT
+    extraction_date: "2024-11-25"
+    expected_tracks: 554
+    expected_features: 79
+    zones:
+      YELLOW: 105
+      GREEN: 391
+      PURPLE: 58
+    notes: "Different feature scales! Incompatible with GPU-extracted data"
+
+  expanded_serato_v1:
+    description: "Expanded dataset from Serato DB (partial extraction)"
+    status: experimental
+    frames_path: results/expanded_features/frames.pkl
+    source_csv: results/user_tracks_expanded.csv
+    extractor_script: scripts/extract_ultimate_gpu.py
+    extraction_date: "2024-12-04"
+    expected_tracks: 1160
+    expected_features: 90
+    zones:
+      YELLOW: 387
+      GREEN: 621
+      PURPLE: 152
+    notes: "Incomplete extraction, may have label quality issues"
+
+# Model registry
+models:
+  zone_ultimate_v1:
+    description: "Track-level XGBoost on user_ultimate_v1"
+    path: models/production/zone_ultimate.pkl
+    trained_on: user_ultimate_v1
+    training_date: "2024-12-04"
+    cv_accuracy: 0.609
+    balanced_accuracy: 0.407
+
+  zone_ultimate_balanced_v1:
+    description: "Balanced XGBoost with SMOTE"
+    path: models/production/zone_ultimate_balanced.pkl
+    trained_on: user_ultimate_v1
+    training_date: "2024-12-04"
+    cv_accuracy: 0.566
+    balanced_accuracy: 0.495

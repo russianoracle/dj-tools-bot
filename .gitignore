@@ -1,105 +1,37 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
-# Virtual Environment
+# Environment
+.env
+.env.*
+!.env.example
 venv/
-ENV/
-env/
-.venv
+.venv/
 
-# PyCharm
-.idea/
-
-# VSCode
-.vscode/
-*.code-workspace
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# pytest
-.pytest_cache/
-.coverage
-htmlcov/
-*.cover
-.hypothesis/
-
-# MyPy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Application specific
-# Cache directory
-.mood-classifier/
-
-# Log files
+# Cache and data (NEVER commit user data!)
+# Production uses DATA_DIR env var to separate code from data
+cache/
+data/
+/data/
+downloads/
 *.log
-
-# Trained models (comment out if you want to commit them)
-models/*.pkl
-models/*.joblib
-
-# User configuration overrides
-config/user_config.yaml
-config/local_config.yaml
-
-# Backup files created by metadata writer
-*.backup
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Test fixtures (large audio files)
-tests/fixtures/*.mp3
-tests/fixtures/*.wav
-tests/fixtures/*.flac
-tests/fixtures/*.m4a
-# Keep a README in fixtures
-!tests/fixtures/README.md
-
-# DEAM dataset (large, should not be in git)
-dataset/
-
-# Temporary files
-*.tmp
-*.temp
-temp/
-tmp/
+*.db
+*.db-journal
+dump.rdb
+backups/
 
 # IDE
-*.swp
-*.swo
-*~
+.DS_Store
+.idea/
+.vscode/
+
+# Training and development (should never be in deploy repo)
+training/
+scripts/
+experiments/
+
+# NOTE: tests/ is INCLUDED for CI/CD integration tests
+# Only test_ci_*.py files are copied, not the full test suite

@@ -1,0 +1,67 @@
+# Training and development (NEVER include in Docker image)
+# These directories contain training scripts that require pyrekordbox
+# Production uses requirements.txt (no pyrekordbox)
+# Training/dev uses requirements-training.txt (includes pyrekordbox)
+training/
+scripts/
+data/
+experiments/
+# tests/ - NEEDED for multi-stage build (test stage)
+docs/
+terraform/
+
+# Large files
+*.pkl
+!models/production/*.pkl
+*.npy
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.opus
+*.ogg
+
+# Git and IDE
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+*.md
+!README.md
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+*.json.key
+*-key.json
+credentials*.json
+
+# Cache and temporary
+cache/
+downloads/
+*.log
+*.tmp
+*.temp
+temp/
+tmp/
+.DS_Store
+
+# Deployment artifacts
+.subtree-deploy/
+deploy.manifest
+deploy.sh

@@ -1,0 +1,28 @@
+# ============================================================================
+# APP-SPECIFIC PRODUCTION DEPENDENCIES
+# ============================================================================
+# Используется с base image python-scientific:3.12 который уже содержит:
+# - numpy, scipy, scikit-learn, pandas, numba, essentia-tensorflow
+
+# Audio Processing (БЕЗ numpy/scipy - они в base)
+librosa>=0.10.0
+soundfile>=0.12.0
+audioread>=3.0.0
+
+# Machine Learning - ТОЛЬКО app-specific
+xgboost>=2.0.0
+
+# Metadata
+mutagen>=1.47.0
+
+# Utilities
+pyyaml>=6.0
+tqdm>=4.65.0
+
+# Telegram Bot
+aiogram>=3.0.0
+python-dotenv>=1.0.0
+
+# Task Queue
+arq>=0.25.0
+redis>=5.0.0

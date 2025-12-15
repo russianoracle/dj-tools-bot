@@ -1,0 +1,65 @@
+# ============================================================================
+# App Base Image (all dependencies, no app code)
+# Rebuild only when requirements-prod-app.txt changes
+# Push to registry: cr.yandex/REGISTRY_ID/app-base:3.12
+# ============================================================================
+#syntax=docker/dockerfile:1.4
+
+ARG PYTHON_VERSION=3.12
+ARG REGISTRY=cr.yandex
+ARG REGISTRY_ID=crp78hhr2t67jkeedad1
+
+FROM ${REGISTRY}/${REGISTRY_ID}/python-scientific:${PYTHON_VERSION}
+
+WORKDIR /app
+
+# Install system dependencies (ffmpeg for audio processing)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    curl \
+    unzip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install deno (required for yt-dlp YouTube extraction)
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Install xray-core for VLESS/Shadowsocks proxy support
+RUN XRAY_VERSION="1.8.24" && \
+    curl -fsSL "https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-64.zip" -o /tmp/xray.zip && \
+    unzip -o /tmp/xray.zip -d /tmp/xray && \
+    mv /tmp/xray/xray /usr/local/bin/xray && \
+    chmod +x /usr/local/bin/xray && \
+    rm -rf /tmp/xray /tmp/xray.zip && \
+    xray version
+
+# Install yt-dlp for audio downloads
+RUN pip install --no-cache-dir yt-dlp
+
+# Install app-specific Python dependencies (librosa, aiogram, etc)
+COPY requirements-prod-app.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --prefer-binary -r requirements-prod-app.txt
+
+# Create non-root user and directories
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/cache /app/downloads /data /app/models/production /app/app && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /data
+
+# Verify key imports
+RUN python -c "import librosa, aiogram, arq; print('✓ App dependencies ready')"
+
+# ============================================================================
+# Usage:
+# ============================================================================
+# Build and push (only when requirements change):
+#   make build-base
+#
+# Or manually:
+#   docker buildx build -f Dockerfile.base \
+#     --build-arg REGISTRY=cr.yandex \
+#     --build-arg REGISTRY_ID=crp78hhr2t67jkeedad1 \
+#     --push \
+#     -t cr.yandex/crp78hhr2t67jkeedad1/app-base:3.12 .
+# ============================================================================
