@@ -95,6 +95,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker  # Use Docker daemon directly instead of buildkit container
 
       - name: Login to Yandex Container Registry
         run: |
@@ -134,6 +136,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker  # Use Docker daemon directly instead of buildkit container
 
       - name: Generate image metadata
         id: meta
@@ -219,6 +223,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker  # Use Docker daemon directly instead of buildkit container
 
       - name: Login to Yandex Container Registry
         run: |
