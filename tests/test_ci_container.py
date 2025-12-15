@@ -188,8 +188,9 @@ class TestContainerPythonEnv:
         assert settings is not None
 
         # Bot
-        from app.modules.bot.routers.main import router
-        assert router is not None
+        from app.modules.bot.routers.main import create_bot, create_dispatcher
+        assert create_bot is not None
+        assert create_dispatcher is not None
 
         # Analysis
         from app.modules.analysis.pipelines.set_analysis import SetAnalysisPipeline
