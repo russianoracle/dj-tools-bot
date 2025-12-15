@@ -118,12 +118,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start Redis
+      - name: Start Redis (test port)
         run: |
+          # Use different port per suite to avoid conflicts
+          if [ "${{ matrix.suite }}" = "container-integration" ]; then
+            REDIS_PORT=6380
+          else
+            REDIS_PORT=6381
+          fi
           docker rm -f redis-test-${{ matrix.suite }} 2>/dev/null || true
-          docker run -d --name redis-test-${{ matrix.suite }} --network host redis:7-alpine
+          docker run -d --name redis-test-${{ matrix.suite }} -p ${REDIS_PORT}:6379 redis:7-alpine
           sleep 2
-          echo "✓ Redis started"
+          echo "✓ Redis started on port ${REDIS_PORT}"
+          echo "REDIS_TEST_PORT=${REDIS_PORT}" >> $GITHUB_ENV
 
       - name: Start test container
         run: |
@@ -135,12 +142,12 @@ jobs:
             -e DATA_DIR=/data \
             -e DOWNLOADS_DIR=/tmp/downloads \
             -e REDIS_HOST=localhost \
-            -e REDIS_PORT=6379 \
+            -e REDIS_PORT=${{ env.REDIS_TEST_PORT }} \
             -v $(pwd)/tests:/app/tests \
             ${{ needs.build.outputs.image_tag }} \
             sleep infinity
 
-          echo "✓ Test container $CONTAINER_NAME started"
+          echo "✓ Test container $CONTAINER_NAME started (Redis port: ${{ env.REDIS_TEST_PORT }})"
 
       - name: Run ${{ matrix.suite }} tests
         run: |
