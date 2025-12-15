@@ -110,8 +110,8 @@ jobs:
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}-${{ needs.check-base-image.outputs.deps-hash }}
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:latest
-          cache-from: type=gha,scope=base
-          cache-to: type=gha,mode=max,scope=base
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:buildcache,mode=max
           build-args: |
             PYTHON_VERSION=${{ env.PYTHON_VERSION }}
 
@@ -164,8 +164,8 @@ jobs:
           file: ./${{ steps.dockerfile.outputs.file }}
           push: true
           tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             PYTHON_VERSION=${{ env.PYTHON_VERSION }}
