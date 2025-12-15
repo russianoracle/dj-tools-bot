@@ -55,6 +55,8 @@ async def redis_client(auto_redis):
 class TestRedisCacheBasics:
     """Базовые операции с Redis кешем."""
 
+    @pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_redis_connection(self, redis_client):
         """Тест подключения к Redis.
 
@@ -79,6 +81,8 @@ class TestRedisCacheBasics:
         result = await redis_client.ping()
         assert result is True, "Redis должен отвечать True на ping()"
 
+    @pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_set_and_get(self, redis_client):
         """Тест базовых операций set/get.
 
@@ -106,6 +110,7 @@ class TestRedisCacheBasics:
         assert result == "test_value", \
             "Извлечённое значение должно совпадать с сохранённым"
 
+    @pytest.mark.asyncio
     async def test_expiration(self, redis_client):
         """Тест TTL (time-to-live) для ключей.
 
@@ -141,6 +146,7 @@ class TestRedisCacheBasics:
         result = await redis_client.get("expiring_key")
         assert result is None, "Ключ должен быть удалён после истечения TTL"
 
+    @pytest.mark.asyncio
     async def test_hash_operations(self, redis_client):
         """Тест операций с hash структурами.
 
@@ -186,6 +192,7 @@ class TestRedisCacheBasics:
 class TestARQTaskQueue:
     """Тесты ARQ task queue через Redis."""
 
+    @pytest.mark.asyncio
     async def test_arq_connection(self, redis_client):
         """Тест подключения ARQ к Redis.
 
@@ -219,6 +226,7 @@ class TestARQTaskQueue:
 
         await arq_redis.close()
 
+    @pytest.mark.asyncio
     async def test_enqueue_task(self, redis_client):
         """Тест постановки задачи в очередь ARQ.
 
@@ -260,6 +268,7 @@ class TestARQTaskQueue:
 
         await arq_redis.close()
 
+    @pytest.mark.asyncio
     async def test_task_result_storage(self, redis_client):
         """Тест хранения результатов задач.
 
@@ -304,6 +313,7 @@ class TestARQTaskQueue:
 class TestCacheIntegration:
     """Интеграционные тесты кеша приложения."""
 
+    @pytest.mark.asyncio
     async def test_prediction_cache(self, redis_client):
         """Тест кеширования предсказаний.
 
@@ -343,6 +353,7 @@ class TestCacheIntegration:
         assert cached["bpm"] == "120.0"
         assert cached["confidence"] == "0.92"
 
+    @pytest.mark.asyncio
     async def test_cache_invalidation(self, redis_client):
         """Тест инвалидации кеша.
 
@@ -378,6 +389,7 @@ class TestCacheIntegration:
         assert result1 is None, "Инвалидированный ключ должен быть удалён"
         assert result2 == "yellow", "Другой ключ должен остаться"
 
+    @pytest.mark.asyncio
     async def test_cache_pattern_deletion(self, redis_client):
         """Тест удаления кеша по паттерну.
 
