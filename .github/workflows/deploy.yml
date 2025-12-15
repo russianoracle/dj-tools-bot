@@ -25,11 +25,73 @@ env:
 
 jobs:
   # =============================================================================
-  # STAGE 1: Build Docker Image (ОДИН РАЗ, используется для всех тестов)
+  # STAGE 1A: Check if base image needs rebuild
+  # =============================================================================
+  check-base-image:
+    name: Check Base Image
+    runs-on: ubuntu-latest
+    outputs:
+      needs-rebuild: ${{ steps.check.outputs.needs-rebuild }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if base image files changed
+        id: check
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -E '^(Dockerfile\.base|requirements-prod\.txt)$'; then
+            echo "needs-rebuild=true" >> $GITHUB_OUTPUT
+            echo "📦 Base image files changed - rebuild required"
+          else
+            echo "needs-rebuild=false" >> $GITHUB_OUTPUT
+            echo "✓ Base image unchanged - using existing"
+          fi
+
+  # =============================================================================
+  # STAGE 1B: Build base image if needed
+  # =============================================================================
+  build-base-image:
+    name: Build Base Image
+    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    needs: [check-base-image]
+    if: needs.check-base-image.outputs.needs-rebuild == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Yandex Container Registry
+        run: |
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+
+      - name: Build and push base image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.base
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:latest
+          cache-from: type=gha,scope=base
+          cache-to: type=gha,mode=max,scope=base
+          build-args: |
+            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
+
+  # =============================================================================
+  # STAGE 1C: Build Docker Image (ОДИН РАЗ, используется для всех тестов)
   # =============================================================================
   build-test-image:
     name: Build Test Image
     runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    needs: [check-base-image, build-base-image]
+    if: always() && (needs.check-base-image.result == 'success')
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
     steps:
@@ -48,17 +110,31 @@ jobs:
         run: |
           echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
+      - name: Decide which Dockerfile to use
+        id: dockerfile
+        run: |
+          if [ "${{ needs.check-base-image.outputs.needs-rebuild }}" == "true" ] || docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }} 2>/dev/null; then
+            echo "file=Dockerfile.fast" >> $GITHUB_OUTPUT
+            echo "📦 Using Dockerfile.fast (with base image)"
+          else
+            echo "file=Dockerfile" >> $GITHUB_OUTPUT
+            echo "📦 Using Dockerfile (standalone - base image not available)"
+          fi
+
       - name: Build and push test image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./${{ steps.dockerfile.outputs.file }}
           push: true
           tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+            REGISTRY=${{ env.REGISTRY }}
+            REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
 
       - name: Logout
         if: always()
