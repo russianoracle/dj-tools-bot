@@ -49,14 +49,24 @@ jobs:
           fi
           docker buildx use ci-builder
 
-      - name: Pull app-base (pre-built dependencies)
+      - name: Ensure app-base exists (build once, cache forever)
         run: |
-          echo "Pulling app-base:${{ env.PYTHON_VERSION }} (contains all dependencies)..."
-          docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }} || {
-            echo "❌ app-base not found! Run: make build-base"
-            exit 1
-          }
-          echo "✓ app-base ready"
+          APP_BASE="${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }}"
+
+          if docker pull "$APP_BASE" 2>/dev/null; then
+            echo "✓ app-base exists in registry (using cached)"
+          else
+            echo "⚙️ app-base not found, building once..."
+            docker buildx build \
+              -f Dockerfile.base \
+              --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
+              --build-arg REGISTRY=${{ env.REGISTRY }} \
+              --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
+              --push \
+              -t "$APP_BASE" \
+              .
+            echo "✓ app-base built and pushed (next builds will be fast)"
+          fi
 
       - name: Build test image (fast - only copies app/)
         id: build
