@@ -135,13 +135,17 @@ def auto_redis():
     redis_started = False
     use_docker = False
 
+    # Читаем порт из env (CI может использовать другой порт)
+    redis_host = os.getenv('REDIS_HOST', 'localhost')
+    redis_port = int(os.getenv('REDIS_PORT', '6379'))
+
     # Проверяем, запущен ли Redis
     try:
         import redis
-        client = redis.Redis(host='localhost', port=6379, socket_connect_timeout=1)
+        client = redis.Redis(host=redis_host, port=redis_port, socket_connect_timeout=1)
         client.ping()
-        print("\n✓ Redis уже запущен (localhost:6379)")
-        os.environ['REDIS_URL'] = 'redis://localhost:6379/0'
+        print(f"\n✓ Redis уже запущен ({redis_host}:{redis_port})")
+        os.environ['REDIS_URL'] = f'redis://{redis_host}:{redis_port}/0'
         yield
         return
     except Exception:
