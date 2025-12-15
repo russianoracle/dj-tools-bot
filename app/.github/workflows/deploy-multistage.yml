@@ -46,10 +46,8 @@ jobs:
 
       - name: Setup buildx
         run: |
-          if ! docker buildx inspect ci-builder >/dev/null 2>&1; then
-            docker buildx create --name ci-builder --driver docker-container --bootstrap
-          fi
-          docker buildx use ci-builder
+          # Use default docker driver (shares credentials with host)
+          docker buildx use default || true
 
       - name: Ensure app-base exists (build once, cache forever)
         run: |
