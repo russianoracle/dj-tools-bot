@@ -49,28 +49,35 @@ jobs:
           fi
           docker buildx use ci-builder
 
-      - name: Build test image (cached)
+      - name: Pull app-base (pre-built dependencies)
+        run: |
+          echo "Pulling app-base:${{ env.PYTHON_VERSION }} (contains all dependencies)..."
+          docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }} || {
+            echo "❌ app-base not found! Run: make build-base"
+            exit 1
+          }
+          echo "✓ app-base ready"
+
+      - name: Build test image (fast - only copies app/)
         id: build
         run: |
           IMAGE_TAG="mood-classifier:test-${{ github.sha }}"
 
-          # Check if image already exists (from previous run or parallel build)
+          # Check if image already exists
           if docker image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
             echo "✓ Image already exists, skipping build"
           else
-            echo "Building $IMAGE_TAG..."
+            echo "Building $IMAGE_TAG (using cached app-base)..."
             docker buildx build \
               --target test \
               --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
               --build-arg REGISTRY=${{ env.REGISTRY }} \
               --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
-              --cache-from type=local,src=/tmp/.buildx-cache \
-              --cache-to type=local,dest=/tmp/.buildx-cache,mode=max \
               --load \
               -t "$IMAGE_TAG" \
               -f Dockerfile.unified \
               .
-            echo "✓ Build complete"
+            echo "✓ Build complete (only app/ copied, deps from cache)"
           fi
 
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT

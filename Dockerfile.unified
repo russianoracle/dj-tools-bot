@@ -1,6 +1,7 @@
 # ============================================================================
 # Multi-Stage Dockerfile for Fast Incremental Builds
-# Stages: base → application → test → production
+# Uses pre-built app-base image with all dependencies
+# Only app/ code changes trigger rebuild (seconds, not minutes)
 # ============================================================================
 #syntax=docker/dockerfile:1.4
 
@@ -9,42 +10,24 @@ ARG REGISTRY=cr.yandex
 ARG REGISTRY_ID=crp78hhr2t67jkeedad1
 
 # ============================================================================
-# STAGE 1: Base Dependencies (rarely changes)
-# Reuses pre-built python-scientific image with numpy, scipy, pandas
+# STAGE 1: App Base (pre-built, pulled from registry)
+# Contains: python-scientific + ffmpeg + yt-dlp + requirements-prod-app.txt
+# Rebuild manually: make build-base (only when dependencies change)
 # ============================================================================
-FROM ${REGISTRY}/${REGISTRY_ID}/python-scientific:${PYTHON_VERSION} AS base
+FROM ${REGISTRY}/${REGISTRY_ID}/app-base:${PYTHON_VERSION} AS app-base
 
-# This stage is almost always CACHED (base image rarely changes)
-
 # ============================================================================
-# STAGE 2: Application Code & Dependencies (changes often)
+# STAGE 2: Application Code (changes frequently - FAST rebuild)
+# Only copies app/ and models/ - takes seconds
 # ============================================================================
-FROM base AS application
+FROM app-base AS application
 
 WORKDIR /app
 
-# Install yt-dlp and ffmpeg for audio downloads
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && \
-    pip install --no-cache-dir yt-dlp && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install app-specific dependencies
-COPY requirements-prod-app.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
-    pip install --no-cache-dir --prefer-binary -r requirements-prod-app.txt
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/cache /app/downloads /data && \
-    chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /data
-
-# Copy application code (changes frequently)
+# Copy application code (this is what changes frequently)
 COPY --chown=appuser:appuser app/ ./app/
 
 # Copy models
-RUN mkdir -p ./models/production
 COPY --chown=appuser:appuser models/production/ ./models/production/
 
 # ============================================================================
