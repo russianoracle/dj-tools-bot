@@ -414,9 +414,14 @@ def load_rekordbox_tracks(require_local_file: bool = False) -> List[RekordboxTra
         # Rekordbox 6 database is encrypted with SQLCipher
         # The key is publicly known (same for all installations)
         # See: https://github.com/dylanljones/pyrekordbox/discussions/97
-        RB6_DB_KEY = "402fd482c38817c35ffa8ffb8c7d93143b749e7d315df7a81732a1ff43608497"
+        # Set RB6_DB_KEY env var locally (not needed on production)
+        rb6_key = os.getenv("RB6_DB_KEY")
+        if not rb6_key:
+            logger.error("RB6_DB_KEY env var not set. Required for local Rekordbox access.")
+            logger.error("Add to .env: RB6_DB_KEY=<key from pyrekordbox docs>")
+            return []
 
-        db = Rekordbox6Database(db_dir=local_db_dir, key=RB6_DB_KEY)
+        db = Rekordbox6Database(db_dir=local_db_dir, key=rb6_key)
         tracks = []
         skipped_no_path = 0
         skipped_not_found = 0
