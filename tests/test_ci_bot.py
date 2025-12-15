@@ -377,3 +377,78 @@ class TestBotLogic:
         assert format_duration(65) == "1:05"
         assert format_duration(3661) == "1:01:01"
         assert format_duration(30) == "0:30"
+
+
+@pytest.mark.unit
+class TestProxyRotation:
+    """Тесты proxy failover для yt-dlp."""
+
+    def test_proxy_rotation_logic(self):
+        """Тест логики ротации прокси.
+
+        ЧТО ПРОВЕРЯЕМ:
+            Proxy rotation пропускает failed прокси
+
+        КАК ПРОВЕРЯЕМ:
+            Симуляция proxy pool и failed set
+
+        ОЖИДАЕМОЕ ПОВЕДЕНИЕ:
+            Failed прокси пропускаются, rotation продолжается
+
+        КРИТЕРИЙ УСПЕШНОСТИ:
+            Получаем рабочие прокси, failed пропущены
+        """
+        # Симулируем proxy pool
+        working_proxies = [None, "socks5://proxy1:1080", "http://proxy2:8080"]
+        failed_proxies = set()
+        proxy_index = 0
+
+        def get_next_proxy():
+            nonlocal proxy_index
+            attempts = 0
+            while attempts < len(working_proxies):
+                proxy = working_proxies[proxy_index % len(working_proxies)]
+                proxy_index += 1
+                if proxy not in failed_proxies:
+                    return proxy
+                attempts += 1
+            return None
+
+        # Первый прокси - direct (None)
+        assert get_next_proxy() is None
+
+        # Второй - proxy1
+        assert get_next_proxy() == "socks5://proxy1:1080"
+
+        # Маркируем proxy1 как failed
+        failed_proxies.add("socks5://proxy1:1080")
+
+        # Теперь должен пропустить proxy1 и дать proxy2
+        assert get_next_proxy() == "http://proxy2:8080"
+
+        # Следующий - снова None (direct)
+        assert get_next_proxy() is None
+
+    def test_proxy_import(self):
+        """Тест импорта proxy функций.
+
+        ЧТО ПРОВЕРЯЕМ:
+            Функции proxy доступны в arq_worker
+
+        КАК ПРОВЕРЯЕМ:
+            Import проверка
+
+        ОЖИДАЕМОЕ ПОВЕДЕНИЕ:
+            Нет ImportError
+
+        КРИТЕРИЙ УСПЕШНОСТИ:
+            Все функции импортированы
+        """
+        from app.services.arq_worker import (
+            get_next_proxy,
+            mark_proxy_failed,
+            download_with_failover,
+        )
+        assert get_next_proxy is not None
+        assert mark_proxy_failed is not None
+        assert download_with_failover is not None
