@@ -7,14 +7,196 @@ Reports progress every 30% with estimated time remaining.
 
 import os
 import time
+import random
 import logging
+import subprocess
 from datetime import datetime
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 
 from arq import create_pool
 from arq.connections import RedisSettings, ArqRedis
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Proxy Rotation for geo-blocked services (SoundCloud, YouTube)
+# ============================================================================
+
+# Free proxy list - rotated on failure
+# Format: protocol://host:port or protocol://user:pass@host:port
+FREE_PROXY_SOURCES = [
+    # Direct (no proxy) - try first
+    None,
+    # Public SOCKS5 proxies (often unreliable, but free)
+    # These will be replaced with working ones at runtime
+]
+
+# Cache of working proxies
+_working_proxies: List[Optional[str]] = [None]  # Start with direct
+_failed_proxies: set = set()
+_proxy_index = 0
+_last_proxy_fetch = 0.0
+
+
+async def fetch_free_proxies() -> List[str]:
+    """
+    Fetch free proxy list from public sources.
+
+    Returns list of proxy URLs in format: socks5://host:port or http://host:port
+    """
+    import aiohttp
+
+    proxies = []
+
+    # Try to fetch from free proxy APIs
+    sources = [
+        # Free proxy list API (SOCKS5)
+        ("https://api.proxyscrape.com/v3/free-proxy-list/get?request=displayproxies&protocol=socks5&timeout=5000&country=all", "socks5"),
+        # HTTP proxies as fallback
+        ("https://api.proxyscrape.com/v3/free-proxy-list/get?request=displayproxies&protocol=http&timeout=5000&country=all", "http"),
+    ]
+
+    for url, protocol in sources:
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                async with session.get(url) as resp:
+                    if resp.status == 200:
+                        text = await resp.text()
+                        for line in text.strip().split("\n"):
+                            line = line.strip()
+                            if ":" in line and len(line) < 50:
+                                proxies.append(f"{protocol}://{line}")
+                        logger.info(f"Fetched {len(proxies)} proxies from {url[:40]}...")
+                        if len(proxies) >= 10:
+                            break
+        except Exception as e:
+            logger.debug(f"Failed to fetch proxies from {url[:40]}: {e}")
+
+    return proxies[:20]  # Limit to 20 proxies
+
+
+async def refresh_proxy_list() -> None:
+    """Refresh proxy list if stale (older than 1 hour)."""
+    global _working_proxies, _last_proxy_fetch
+
+    # Refresh every hour
+    if time.time() - _last_proxy_fetch < 3600:
+        return
+
+    try:
+        new_proxies = await fetch_free_proxies()
+        if new_proxies:
+            # Keep direct (None) as first option, add new proxies
+            _working_proxies = [None] + new_proxies
+            _failed_proxies.clear()
+            _last_proxy_fetch = time.time()
+            logger.info(f"Refreshed proxy list: {len(new_proxies)} proxies available")
+    except Exception as e:
+        logger.warning(f"Failed to refresh proxy list: {e}")
+
+
+def get_next_proxy() -> Optional[str]:
+    """Get next proxy from rotation, skipping failed ones."""
+    global _proxy_index
+
+    # First try custom proxy from env
+    custom_proxy = os.getenv("YTDLP_PROXY")
+    if custom_proxy and custom_proxy not in _failed_proxies:
+        return custom_proxy
+
+    # Rotate through available proxies
+    attempts = 0
+    while attempts < len(_working_proxies):
+        proxy = _working_proxies[_proxy_index % len(_working_proxies)]
+        _proxy_index += 1
+
+        if proxy not in _failed_proxies:
+            return proxy
+        attempts += 1
+
+    # All proxies failed, reset and try direct
+    logger.warning("All proxies failed, resetting to direct connection")
+    _failed_proxies.clear()
+    return None
+
+
+def mark_proxy_failed(proxy: Optional[str]) -> None:
+    """Mark a proxy as failed."""
+    if proxy:
+        _failed_proxies.add(proxy)
+        logger.info(f"Marked proxy as failed: {proxy[:30]}...")
+
+
+def download_with_failover(url: str, output_template: str, max_retries: int = 3) -> str:
+    """
+    Download with automatic proxy failover.
+
+    Tries direct connection first, then rotates through proxies on failure.
+
+    Returns:
+        Path to downloaded file
+
+    Raises:
+        Exception if all attempts fail
+    """
+    last_error = None
+
+    for attempt in range(max_retries):
+        proxy = get_next_proxy()
+        proxy_desc = proxy[:30] + "..." if proxy else "direct"
+
+        logger.info(f"Download attempt {attempt + 1}/{max_retries} via {proxy_desc}")
+
+        cmd = [
+            "yt-dlp",
+            "-x",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "-o", output_template,
+            "--max-filesize", "500M",
+            "--no-warnings",
+            "--socket-timeout", "30",
+        ]
+
+        if proxy:
+            cmd.extend(["--proxy", proxy])
+
+        cmd.append(url)
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=120  # 2 min timeout per attempt
+            )
+
+            if result.returncode == 0:
+                logger.info(f"Download successful via {proxy_desc}")
+                return output_template.replace(".%(ext)s", "")
+
+            # Check for geo-block or rate limit
+            stderr = result.stderr.lower()
+            if "403" in stderr or "forbidden" in stderr or "geo" in stderr:
+                logger.warning(f"Geo-blocked via {proxy_desc}, trying next proxy")
+                mark_proxy_failed(proxy)
+                continue
+
+            # Other error
+            last_error = result.stderr[:200]
+
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Timeout via {proxy_desc}")
+            mark_proxy_failed(proxy)
+            last_error = "Download timeout"
+            continue
+
+        except Exception as e:
+            last_error = str(e)
+            mark_proxy_failed(proxy)
+
+    raise Exception(f"Download failed after {max_retries} attempts: {last_error}")
 
 # Redis settings
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -195,7 +377,6 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
     Returns:
         Analysis result dict
     """
-    import subprocess
     import uuid
 
     job_id = ctx.get("job_id", "unknown")
@@ -213,21 +394,11 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
     update_job_progress(job_id, 5, "📥 Downloading audio...")
 
     try:
-        # Download with yt-dlp
-        cmd = [
-            "yt-dlp",
-            "-x",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "-o", output_template,
-            "--max-filesize", "500M",
-            url,
-        ]
+        # Refresh proxy list if needed (async)
+        await refresh_proxy_list()
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-
-        if result.returncode != 0:
-            raise Exception(f"Download failed: {result.stderr[:200]}")
+        # Download with failover (tries direct, then proxies)
+        download_with_failover(url, output_template, max_retries=3)
 
         # Find downloaded file
         file_path = None
