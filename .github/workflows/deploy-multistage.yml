@@ -99,12 +99,22 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 3: Test (runs on built container)
+  # JOB 3: Tests (matrix: 2 runners in parallel)
+  # Runner 1: container + integration (sequential)
+  # Runner 2: unit tests (parallel)
   # ============================================
   test:
-    name: Run Tests
+    name: Tests (${{ matrix.suite }})
     runs-on: self-hosted
     needs: [security, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: container-integration
+            markers: "container or integration or pipeline"
+          - suite: unit
+            markers: "unit"
     services:
       redis:
         image: redis:7-alpine
@@ -115,9 +125,10 @@ jobs:
 
       - name: Start test container
         run: |
-          docker rm -f test-app 2>/dev/null || true
+          CONTAINER_NAME="test-app-${{ matrix.suite }}"
+          docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
           docker run -d \
-            --name test-app \
+            --name "$CONTAINER_NAME" \
             --network host \
             -e DATA_DIR=/data \
             -e DOWNLOADS_DIR=/tmp/downloads \
@@ -127,21 +138,19 @@ jobs:
             ${{ needs.build.outputs.image_tag }} \
             sleep infinity
 
-          echo "✓ Test container started"
+          echo "✓ Test container $CONTAINER_NAME started"
 
-      - name: Run integration tests (first)
+      - name: Run ${{ matrix.suite }} tests
         run: |
-          docker exec test-app \
-            pytest tests/ -m "integration or pipeline" -vv --tb=short
-
-      - name: Run unit tests
-        run: |
-          docker exec test-app \
-            pytest tests/ -m "unit or container" -vv --tb=short
+          CONTAINER_NAME="test-app-${{ matrix.suite }}"
+          docker exec "$CONTAINER_NAME" \
+            pytest tests/ -m "${{ matrix.markers }}" -vv --tb=short
 
       - name: Cleanup
         if: always()
-        run: docker rm -f test-app || true
+        run: |
+          CONTAINER_NAME="test-app-${{ matrix.suite }}"
+          docker rm -f "$CONTAINER_NAME" || true
 
   # ============================================
   # JOB 4: Push Production Image
