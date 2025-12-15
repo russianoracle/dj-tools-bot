@@ -54,6 +54,9 @@ RUN pip install --no-cache-dir \
     pytest-asyncio>=0.21.0 \
     pytest-timeout>=2.1.0
 
+# Copy pytest configuration
+COPY --chown=appuser:appuser pytest.ini ./
+
 # Copy test files
 COPY --chown=appuser:appuser tests/ ./tests/
 
