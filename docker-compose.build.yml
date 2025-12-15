@@ -1,0 +1,33 @@
+version: "3.9"
+
+# Build configuration for CI/CD pipeline
+# Usage:
+#   docker compose -f docker-compose.build.yml build base  # when deps change
+#   docker compose -f docker-compose.build.yml build app   # always
+#   docker compose -f docker-compose.build.yml push
+
+services:
+  base:
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/app-base:${PYTHON_VERSION:-3.12}
+    build:
+      context: .
+      dockerfile: Dockerfile.base
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+      cache_from:
+        - ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/app-base:${PYTHON_VERSION:-3.12}
+
+  app:
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/mood-classifier:${TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.unified
+      target: production
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+        REGISTRY: ${REGISTRY:-cr.yandex}
+        REGISTRY_ID: ${REGISTRY_ID:-crp78hhr2t67jkeedad1}
+      cache_from:
+        - ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/mood-classifier:${TAG:-latest}
+    depends_on:
+      - base

@@ -12,60 +12,6 @@ env:
   PYTHON_VERSION: "3.12"
 
 jobs:
-  # Build base image only when Dockerfile.base or requirements change
-  build-base:
-    name: Build Base Image
-    runs-on: self-hosted
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    outputs:
-      base-changed: ${{ steps.changes.outputs.base }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Check for base image changes
-        id: changes
-        run: |
-          if git diff --name-only HEAD~1 HEAD | grep -qE '(Dockerfile\.base|requirements-prod-app\.txt)'; then
-            echo "base=true" >> $GITHUB_OUTPUT
-            echo "Base image files changed, will rebuild"
-          else
-            echo "base=false" >> $GITHUB_OUTPUT
-            echo "No base image changes, skipping rebuild"
-          fi
-
-      - name: Set up Docker Buildx
-        if: steps.changes.outputs.base == 'true'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Yandex Container Registry
-        if: steps.changes.outputs.base == 'true'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: json_key
-          password: ${{ secrets.YC_SA_JSON_KEY }}
-
-      - name: Build and push base image
-        if: steps.changes.outputs.base == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.base
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }}
-          build-args: |
-            REGISTRY=${{ env.REGISTRY }}
-            REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
-            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
-          cache-from: type=gha,scope=base
-          cache-to: type=gha,mode=max,scope=base
-
-      - name: Logout from registry
-        if: always() && steps.changes.outputs.base == 'true'
-        run: docker logout ${{ env.REGISTRY }} || true
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -81,7 +27,7 @@ jobs:
         run: pip install ruff
 
       - name: Run ruff (warnings only)
-        run: ruff check src/ --ignore=E501,F401,F541 || true
+        run: ruff check app/ --ignore=E501,F401,F541 || true
 
       - name: Cleanup
         if: always()
@@ -130,46 +76,50 @@ jobs:
         run: rm -rf ~/.cache/pip __pycache__ .pytest_cache
 
   build:
-    name: Build & Push
+    name: Build & Deploy
     runs-on: self-hosted
-    needs: [lint, security, test, build-base]
+    needs: [lint, security, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Login to Yandex Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: json_key
-          password: ${{ secrets.YC_SA_JSON_KEY }}
+        run: |
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login \
+            --username json_key \
+            --password-stdin \
+            ${{ env.REGISTRY }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.unified
-          target: production
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          build-args: |
-            REGISTRY=${{ env.REGISTRY }}
-            REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
-            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
-          cache-from: type=gha,scope=app
-          cache-to: type=gha,mode=max,scope=app
+      - name: Check for base image changes
+        id: changes
+        run: |
+          if git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -qE '(Dockerfile\.base|requirements-prod-app\.txt)'; then
+            echo "base=true" >> $GITHUB_OUTPUT
+            echo "Base image files changed, will rebuild"
+          else
+            echo "base=false" >> $GITHUB_OUTPUT
+            echo "No base image changes, using cached base"
+          fi
 
-      - name: Logout from registry
-        if: always()
-        run: docker logout ${{ env.REGISTRY }} || true
+      - name: Build base image (if changed)
+        if: steps.changes.outputs.base == 'true'
+        run: |
+          docker compose -f docker-compose.build.yml build base
+          docker compose -f docker-compose.build.yml push base
 
-      - name: Cleanup Docker
+      - name: Build and push app image
+        run: |
+          docker compose -f docker-compose.build.yml build app
+          docker compose -f docker-compose.build.yml push app
+
+      - name: Deploy with docker-compose
+        run: |
+          docker compose pull
+          docker compose up -d --remove-orphans
+          docker compose ps
+
+      - name: Cleanup
         if: always()
         run: |
-          docker system prune -af || true
-          rm -rf ~/.docker/config.json || true
+          docker logout ${{ env.REGISTRY }} || true
+          docker system prune -f || true
