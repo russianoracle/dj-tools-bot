@@ -115,13 +115,15 @@ jobs:
             markers: "container or integration or pipeline"
           - suite: unit
             markers: "unit"
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start Redis
+        run: |
+          docker rm -f redis-test-${{ matrix.suite }} 2>/dev/null || true
+          docker run -d --name redis-test-${{ matrix.suite }} --network host redis:7-alpine
+          sleep 2
+          echo "✓ Redis started"
 
       - name: Start test container
         run: |
@@ -151,6 +153,7 @@ jobs:
         run: |
           CONTAINER_NAME="test-app-${{ matrix.suite }}"
           docker rm -f "$CONTAINER_NAME" || true
+          docker rm -f redis-test-${{ matrix.suite }} || true
 
   # ============================================
   # JOB 4: Push Production Image
