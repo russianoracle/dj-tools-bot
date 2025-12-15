@@ -188,6 +188,20 @@ jobs:
             REGISTRY=${{ env.REGISTRY }}
             REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
 
+      - name: Verify prod image loaded to Docker
+        run: |
+          echo "=== Verifying prod image in Docker daemon ==="
+          docker images | grep "${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}"
+
+          # Проверяем что образ существует
+          if ! docker image inspect "${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}" >/dev/null 2>&1; then
+            echo "❌ Prod image NOT found in Docker daemon after build!"
+            echo "Available images:"
+            docker images
+            exit 1
+          fi
+          echo "✅ Prod image found in Docker daemon"
+
       - name: Logout
         if: always()
         run: docker logout ${{ env.REGISTRY }}
