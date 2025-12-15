@@ -120,10 +120,10 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
-  # STAGE 1C: Build Docker Image (ОДИН РАЗ, используется для всех тестов)
+  # STAGE 1C: Build Production Image (используется для тестов и деплоя)
   # =============================================================================
-  build-test-image:
-    name: Build Test Image
+  build-prod-image:
+    name: Build Prod Image
     runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     needs: [check-base-image, build-base-image]
     if: always() && (needs.check-base-image.result == 'success')
@@ -200,7 +200,7 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    needs: [build-test-image]
+    needs: [build-prod-image]
     steps:
       - uses: actions/checkout@v4
 
@@ -227,7 +227,7 @@ jobs:
   test-integration-redis:
     name: Integration Tests (Redis)
     runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    needs: [build-test-image]
+    needs: [build-prod-image]
     services:
       redis:
         image: redis:7-alpine
@@ -276,7 +276,7 @@ jobs:
   test-pipelines:
     name: Pipeline Tests (Real Audio)
     runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    needs: [build-test-image]
+    needs: [build-prod-image]
     steps:
       - uses: actions/checkout@v4
 
