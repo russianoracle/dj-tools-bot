@@ -236,7 +236,7 @@ jobs:
           YC_FOLDER_ID=${{ secrets.YC_FOLDER_ID }} \
           docker-compose -f docker-compose.prod.yml pull
 
-          # Start services (app + redis + fluent-bit)
+          # Start services (app + arq-worker + redis + fluent-bit)
           REGISTRY=${{ env.REGISTRY }} \
           REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
           YC_LOG_GROUP_ID=${{ secrets.YC_LOG_GROUP_ID }} \
@@ -246,7 +246,7 @@ jobs:
           # Verify deployment
           sleep 5
           docker-compose -f docker-compose.prod.yml ps
-          echo "✓ Deployment successful (app + redis + fluent-bit)"
+          echo "✓ Deployment successful (app + arq-worker + redis + fluent-bit)"
 
       - name: Logout from registry
         if: always()

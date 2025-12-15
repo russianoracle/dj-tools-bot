@@ -36,6 +36,28 @@ services:
         max-file: "3"
         tag: "mood-classifier"
 
+  arq-worker:
+    image: ${REGISTRY}/${REGISTRY_ID}/mood-classifier:latest
+    container_name: mood-arq-worker
+    restart: unless-stopped
+    command: ["arq", "app.services.arq_worker.WorkerSettings"]
+    volumes:
+      - mood-data:/data
+    environment:
+      - DATA_DIR=/data
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DOWNLOADS_DIR=/data/downloads
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "arq-worker"
+
   fluent-bit:
     image: cr.yandex/yc/fluent-bit-plugin-yandex:v1.0.4-fluent-bit-1.8.6
     container_name: fluent-bit
