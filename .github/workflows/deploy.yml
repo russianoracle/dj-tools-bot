@@ -126,12 +126,12 @@ jobs:
             mood-classifier:test-${{ github.sha }} \
             pytest tests/ -m "integration" -vv --tb=short
 
-      - name: Run pipeline tests (real audio)
+      - name: Run analysis tests (real audio)
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
             mood-classifier:test-${{ github.sha }} \
-            pytest tests/ -m "pipeline" -vv --tb=short
+            pytest tests/ -m "analysis" -vv --tb=short
 
       - name: Cleanup Redis
         if: always()
