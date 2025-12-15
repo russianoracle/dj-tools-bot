@@ -54,7 +54,7 @@ jobs:
           GITLEAKS_ENABLE_SUMMARY: false
 
   # ============================================
-  # JOB 3: Build & Test (LOCAL ONLY, NO PUSH)
+  # JOB 3: Build & Test
   # ============================================
   build-and-test:
     name: Build & Test
@@ -97,41 +97,31 @@ jobs:
           echo "✓ Test image built and loaded to Docker daemon"
           docker images | grep mood-classifier
 
-      - name: Run unit tests
+      - name: Start Redis for integration tests
         run: |
-          docker run --rm \
-            -v $(pwd)/tests:/app/tests \
-            mood-classifier:test-${{ github.sha }} \
-            pytest tests/ -m "unit" -vv --tb=short
+          docker rm -f test-redis 2>/dev/null || true
+          docker run -d --name test-redis -p 6379:6379 redis:7-alpine
+          sleep 2
 
-      - name: Run container dependency tests
+      - name: Run integration tests (first, always)
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
             -e DATA_DIR=/data \
             -e DOWNLOADS_DIR=/tmp/downloads \
-            mood-classifier:test-${{ github.sha }} \
-            pytest tests/test_ci_container.py -m "container" -vv --tb=short
-
-      - name: Start Redis for integration tests
-        run: |
-          docker run -d --name test-redis -p 6379:6379 redis:7-alpine
-          sleep 2
-
-      - name: Run integration tests with Redis
-        run: |
-          docker run --rm \
-            -v $(pwd)/tests:/app/tests \
             --network host \
             mood-classifier:test-${{ github.sha }} \
-            pytest tests/ -m "integration" -vv --tb=short
+            pytest tests/ -m "integration or pipeline" -vv --tb=short
 
-      - name: Run pipeline tests (real audio)
+      - name: Run unit and container tests (parallel background)
         run: |
+          # Run unit tests in background
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
+            -e DATA_DIR=/data \
+            -e DOWNLOADS_DIR=/tmp/downloads \
             mood-classifier:test-${{ github.sha }} \
-            pytest tests/ -m "pipeline" -vv --tb=short
+            pytest tests/ -m "unit or container" -vv --tb=short
 
       - name: Cleanup Redis
         if: always()
