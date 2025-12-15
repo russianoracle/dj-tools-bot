@@ -1,4 +1,4 @@
-name: CI/CD Multi-Stage
+name: CI/CD Pipeline
 
 on:
   push:
@@ -11,41 +11,16 @@ env:
   REGISTRY: cr.yandex
   IMAGE_NAME: mood-classifier
   PYTHON_VERSION: "3.12"
-  SHARED_BUILDER: ci-shared-builder
 
 jobs:
   # ============================================
-  # JOB 1: Setup Shared Builder (idempotent)
-  # ============================================
-  setup-builder:
-    name: Setup Shared Builder
-    runs-on: self-hosted
-    steps:
-      - name: Create or reuse shared builder
-        run: |
-          if ! docker buildx inspect ${{ env.SHARED_BUILDER }} >/dev/null 2>&1; then
-            echo "🔧 Creating new shared builder: ${{ env.SHARED_BUILDER }}"
-            docker buildx create \
-              --name ${{ env.SHARED_BUILDER }} \
-              --driver docker-container \
-              --driver-opt network=host \
-              --buildkitd-flags '--oci-worker-gc=false' \
-              --bootstrap
-          else
-            echo "✓ Shared builder already exists: ${{ env.SHARED_BUILDER }}"
-          fi
-          docker buildx use ${{ env.SHARED_BUILDER }}
-          docker buildx inspect --bootstrap
-
-  # ============================================
-  # JOB 2: Security Scan
+  # JOB 1: Security Scan (parallel with build)
   # ============================================
   security:
     name: Security Scan
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
-
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
@@ -54,109 +29,108 @@ jobs:
           GITLEAKS_ENABLE_SUMMARY: false
 
   # ============================================
-  # JOB 3: Build Test Image
+  # JOB 2: Build (uses local cache, skips if valid)
   # ============================================
   build:
-    name: Build Test Image
+    name: Build Image
     runs-on: self-hosted
-    needs: [setup-builder, security]
+    outputs:
+      image_tag: ${{ steps.build.outputs.image_tag }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login to registry (for cache pull only)
+      - name: Login to registry
         run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Use shared builder
-        run: docker buildx use ${{ env.SHARED_BUILDER }}
-
-      - name: Pull previous image for layer cache
+      - name: Setup buildx
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest 2>/dev/null || \
-          echo "⚠️ No previous image, building from scratch"
+          if ! docker buildx inspect ci-builder >/dev/null 2>&1; then
+            docker buildx create --name ci-builder --driver docker-container --bootstrap
+          fi
+          docker buildx use ci-builder
 
-      - name: Pull base image for cache
+      - name: Build test image (cached)
+        id: build
         run: |
-          BASE_IMAGE="${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}"
-          docker pull "$BASE_IMAGE" 2>/dev/null || echo "⚠️ Base image pull failed, will build from scratch"
+          IMAGE_TAG="mood-classifier:test-${{ github.sha }}"
 
-      - name: Build test stage (includes app + test deps)
-        run: |
-          docker buildx build \
-            --builder ${{ env.SHARED_BUILDER }} \
-            --target test \
-            --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
-            --build-arg REGISTRY=${{ env.REGISTRY }} \
-            --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
-            --cache-from type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
-            --cache-from type=local,src=/tmp/.buildx-cache \
-            --cache-to type=local,dest=/tmp/.buildx-cache,mode=max \
-            --output type=docker,name=mood-classifier:test-${{ github.sha }} \
-            --file Dockerfile.unified \
-            .
+          # Check if image already exists (from previous run or parallel build)
+          if docker image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "✓ Image already exists, skipping build"
+          else
+            echo "Building $IMAGE_TAG..."
+            docker buildx build \
+              --target test \
+              --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
+              --build-arg REGISTRY=${{ env.REGISTRY }} \
+              --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
+              --cache-from type=local,src=/tmp/.buildx-cache \
+              --cache-to type=local,dest=/tmp/.buildx-cache,mode=max \
+              --load \
+              -t "$IMAGE_TAG" \
+              -f Dockerfile.unified \
+              .
+            echo "✓ Build complete"
+          fi
 
-          echo "✓ Test image built and loaded to Docker daemon"
-          docker images | grep mood-classifier
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Logout from registry
+      - name: Logout
         if: always()
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 4a: Integration Tests (runner 1)
+  # JOB 3: Test (runs on built container)
   # ============================================
-  test-integration:
-    name: Integration Tests
+  test:
+    name: Run Tests
     runs-on: self-hosted
-    needs: build
+    needs: [security, build]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start Redis
+      - name: Start test container
         run: |
-          docker rm -f test-redis-integration 2>/dev/null || true
-          docker run -d --name test-redis-integration -p 6379:6379 redis:7-alpine
-          sleep 2
-
-      - name: Run integration and pipeline tests
-        run: |
-          docker run --rm \
-            -v $(pwd)/tests:/app/tests \
+          docker rm -f test-app 2>/dev/null || true
+          docker run -d \
+            --name test-app \
+            --network host \
             -e DATA_DIR=/data \
             -e DOWNLOADS_DIR=/tmp/downloads \
-            --network host \
-            mood-classifier:test-${{ github.sha }} \
+            -e REDIS_HOST=localhost \
+            -e REDIS_PORT=6379 \
+            -v $(pwd)/tests:/app/tests \
+            ${{ needs.build.outputs.image_tag }} \
+            sleep infinity
+
+          echo "✓ Test container started"
+
+      - name: Run integration tests (first)
+        run: |
+          docker exec test-app \
             pytest tests/ -m "integration or pipeline" -vv --tb=short
 
-      - name: Cleanup Redis
-        if: always()
-        run: docker rm -f test-redis-integration || true
-
-  # ============================================
-  # JOB 4b: Unit Tests (runner 2, parallel)
-  # ============================================
-  test-unit:
-    name: Unit Tests
-    runs-on: self-hosted
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run unit and container tests
+      - name: Run unit tests
         run: |
-          docker run --rm \
-            -v $(pwd)/tests:/app/tests \
-            -e DATA_DIR=/data \
-            -e DOWNLOADS_DIR=/tmp/downloads \
-            mood-classifier:test-${{ github.sha }} \
+          docker exec test-app \
             pytest tests/ -m "unit or container" -vv --tb=short
 
+      - name: Cleanup
+        if: always()
+        run: docker rm -f test-app || true
+
   # ============================================
-  # JOB 5: Build & Push Production (AFTER TESTS)
+  # JOB 4: Push Production Image
   # ============================================
-  push-production:
-    name: Push Production Image
+  push:
+    name: Push to Registry
     runs-on: self-hosted
-    needs: [test-integration, test-unit]
+    needs: test
     if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
@@ -164,15 +138,12 @@ jobs:
       - name: Login to registry
         run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Use shared builder
-        run: docker buildx use ${{ env.SHARED_BUILDER }}
+      - name: Setup buildx
+        run: docker buildx use ci-builder
 
-      - name: Build production stage and push
+      - name: Build and push production
         run: |
-          echo "🚀 Building production stage (reuses layers from test build)"
-
           docker buildx build \
-            --builder ${{ env.SHARED_BUILDER }} \
             --target production \
             --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
             --build-arg REGISTRY=${{ env.REGISTRY }} \
@@ -181,119 +152,55 @@ jobs:
             --push \
             -t ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             -t ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
-            --file Dockerfile.unified \
+            -f Dockerfile.unified \
             .
 
-          echo "✓ Production image pushed to registry"
+          echo "✓ Production image pushed"
 
-      - name: Logout from registry
+      - name: Logout
         if: always()
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 5: Deploy to Production VM
+  # JOB 5: Deploy to VM
   # ============================================
   deploy:
-    name: Deploy to VM
+    name: Deploy
     runs-on: self-hosted
-    needs: push-production
-    if: success()
+    needs: push
     steps:
-      - name: Deploy to production VM
+      - name: Deploy to production
         run: |
-          echo "🚀 Deploying to production VM: 158.160.122.216"
-
           ssh -o StrictHostKeyChecking=no ubuntu@158.160.122.216 << 'EOF'
-            # Login to registry
             echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
-
-            # Pull latest image
             docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-
-            # Stop old container
             docker stop mood-classifier 2>/dev/null || true
             docker rm mood-classifier 2>/dev/null || true
-
-            # Start new container
             docker run -d \
               --name mood-classifier \
               --restart unless-stopped \
               -v /data:/data \
               -e DATA_DIR=/data \
               ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-
-            # Verify deployment
             sleep 5
             docker ps | grep mood-classifier
-            echo "✓ Deployment successful"
+            echo "✓ Deployed"
           EOF
 
   # ============================================
-  # JOB 6: Cleanup Local Cache
+  # JOB 6: Cleanup
   # ============================================
   cleanup:
-    name: Cleanup Local Cache
+    name: Cleanup
     runs-on: self-hosted
-    needs: [push-production]
+    needs: push
     if: always()
     steps:
-      - name: Clean old local test images
+      - name: Clean old images
         run: |
-          echo "🧹 Cleaning old local test images (keeping last 2)"
-
-          # Keep only last 2 test images
           docker images --format "{{.Repository}}:{{.Tag}}" | \
             grep "mood-classifier:test-" | \
             tail -n +3 | \
             xargs -r docker rmi -f || true
-
-          # Prune dangling images
           docker image prune -f
-
-          echo "✓ Cleanup complete"
-
-      - name: Verify BuildKit cache size
-        run: |
-          if [ -d /tmp/.buildx-cache ]; then
-            cache_size=$(du -sh /tmp/.buildx-cache | cut -f1)
-            echo "📊 BuildKit cache size: $cache_size"
-
-            # Warn if cache is too large (>15GB)
-            size_bytes=$(du -sb /tmp/.buildx-cache | cut -f1)
-            if [ $size_bytes -gt 16000000000 ]; then
-              echo "⚠️ Cache is very large (>15GB), consider clearing"
-            fi
-          fi
-
-  # ============================================
-  # JOB 7: Cleanup Old Registry Images
-  # ============================================
-  cleanup-registry:
-    name: Cleanup Registry
-    runs-on: self-hosted
-    needs: [cleanup]
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Install yc CLI
-        run: |
-          if ! command -v yc &> /dev/null; then
-            curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-            source ~/.bashrc
-          fi
-
-      - name: Cleanup old images in registry (keep last 5)
-        run: |
-          echo "🧹 Cleaning old images from registry (keeping last 5)"
-
-          # List all images except latest
-          yc container image list \
-            --registry-id ${{ secrets.YC_REGISTRY_ID }} \
-            --format json | \
-          jq -r '.[] | select(.tags[] | contains("latest") | not) | .id' | \
-          tail -n +6 | \
-          while read image_id; do
-            echo "Deleting image: $image_id"
-            yc container image delete --id $image_id || true
-          done
-
-          echo "✓ Registry cleanup complete"
+          echo "✓ Cleanup done"
