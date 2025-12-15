@@ -169,6 +169,17 @@ jobs:
             echo "📦 Using Dockerfile (standalone)"
           fi
 
+      - name: Pull previous prod image for cache
+        run: |
+          # Try to pull from registry for cache reuse
+          docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest 2>/dev/null || \
+          echo "⚠️ No previous image in registry, building from scratch"
+
+          # Check if local previous build exists
+          if docker image inspect mood-classifier:prod-latest >/dev/null 2>&1; then
+            echo "✓ Found local previous build for cache"
+          fi
+
       - name: Build prod image (local only)
         uses: docker/build-push-action@v5
         with:
@@ -176,7 +187,9 @@ jobs:
           file: ./${{ steps.dockerfile.outputs.file }}
           push: false  # NO push - build locally only
           load: true   # Load to Docker daemon for local use
-          tags: mood-classifier:prod-${{ github.sha }}
+          tags: |
+            mood-classifier:prod-${{ github.sha }}
+            mood-classifier:prod-latest
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache
             type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
@@ -220,6 +233,7 @@ jobs:
             --cache-to type=local,dest=/tmp/.buildx-cache-test,mode=max \
             --load \
             -t mood-classifier:test-${{ github.sha }} \
+            -t mood-classifier:test-latest \
             -f Dockerfile.test \
             .
 
