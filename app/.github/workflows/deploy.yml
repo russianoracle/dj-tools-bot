@@ -95,8 +95,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker  # Use Docker daemon directly instead of buildkit container
 
       - name: Login to Yandex Container Registry
         run: |
@@ -136,8 +134,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker  # Use Docker daemon directly instead of buildkit container
 
       - name: Generate image metadata
         id: meta
@@ -173,14 +169,14 @@ jobs:
             echo "📦 Using Dockerfile (standalone)"
           fi
 
-      - name: Build prod image (local only, no push)
+      - name: Build prod image (local only)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./${{ steps.dockerfile.outputs.file }}
-          push: false
-          load: true
-          tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+          push: false  # NO push - build locally only
+          load: true   # Load to Docker daemon for local use
+          tags: mood-classifier:prod-${{ github.sha }}
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache
             type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
@@ -191,20 +187,6 @@ jobs:
             PYTHON_VERSION=${{ env.PYTHON_VERSION }}
             REGISTRY=${{ env.REGISTRY }}
             REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
-
-      - name: Verify prod image loaded to Docker
-        run: |
-          echo "=== Verifying prod image in Docker daemon ==="
-          docker images | grep "${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}"
-
-          # Проверяем что образ существует
-          if ! docker image inspect "${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}" >/dev/null 2>&1; then
-            echo "❌ Prod image NOT found in Docker daemon after build!"
-            echo "Available images:"
-            docker images
-            exit 1
-          fi
-          echo "✅ Prod image found in Docker daemon"
 
       - name: Logout
         if: always()
@@ -223,30 +205,23 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker  # Use Docker daemon directly instead of buildkit container
 
       - name: Login to Yandex Container Registry
         run: |
           echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Build test image (local only, no push)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.test
-          push: false
-          load: true
-          tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
-          cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-buildcache
-            type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
-          build-args: |
-            REGISTRY=${{ env.REGISTRY }}
-            REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
-            IMAGE_NAME=${{ env.IMAGE_NAME }}
-            IMAGE_TAG=test-${{ github.sha }}
+      - name: Build test image with build-context (local only)
+        run: |
+          # Use --build-context to reference local prod image from Docker daemon
+          docker buildx build \
+            --build-context prod-image=docker-image://mood-classifier:prod-${{ github.sha }} \
+            --cache-from type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-buildcache \
+            --cache-from type=local,src=/tmp/.buildx-cache-test \
+            --cache-to type=local,dest=/tmp/.buildx-cache-test,mode=max \
+            --load \
+            -t mood-classifier:test-${{ github.sha }} \
+            -f Dockerfile.test \
+            .
 
       - name: Logout
         if: always()
@@ -283,10 +258,10 @@ jobs:
 
       - name: Run unit tests in container
         run: |
-          # Образ уже на runner после build-test-image (локальный кэш)
+          # Use local short image name (no registry pull)
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
+            mood-classifier:test-${{ github.sha }} \
             pytest tests/ -m "unit" -vv --tb=short
 
   # =============================================================================
@@ -318,7 +293,7 @@ jobs:
             --network host \
             -e REDIS_URL=redis://localhost:6379/0 \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
+            mood-classifier:test-${{ github.sha }} \
             pytest tests/test_ci_bot.py -vv --tb=short
 
       - name: Run Redis cache integration tests
@@ -327,7 +302,7 @@ jobs:
             --network host \
             -e REDIS_URL=redis://localhost:6379/0 \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
+            mood-classifier:test-${{ github.sha }} \
             pytest tests/test_ci_cache_redis.py -vv --tb=short
 
   # =============================================================================
@@ -353,14 +328,14 @@ jobs:
           # Образ уже на runner после build-test-image (локальный кэш)
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
+            mood-classifier:test-${{ github.sha }} \
             pytest tests/test_ci_pipelines.py::TestTrackAnalysisPipeline -vv --tb=short
 
       - name: Run SetAnalysisPipeline tests
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
+            mood-classifier:test-${{ github.sha }} \
             pytest tests/test_ci_pipelines.py::TestSetAnalysisPipeline -vv --tb=short
 
   # =============================================================================
@@ -377,10 +352,10 @@ jobs:
 
       - name: Tag and push prod image
         run: |
-          # Образ уже есть локально после билда (с тегом test-SHA)
-          docker tag ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+          # Re-tag local prod image with registry name and push
+          docker tag mood-classifier:prod-${{ github.sha }} \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker tag ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+          docker tag mood-classifier:prod-${{ github.sha }} \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
           docker push ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -388,8 +363,8 @@ jobs:
 
       - name: Update registry cache
         run: |
-          # Пушим в registry cache для следующих билдов
-          docker tag ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+          # Push buildcache for future builds
+          docker tag mood-classifier:prod-${{ github.sha }} \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache
           docker push ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache || true
 
@@ -410,15 +385,15 @@ jobs:
         run: |
           echo "=== Cleaning old Docker images (keeping last 2) ==="
 
-          # Удаляем старые test-* образы (оставляем последние 2)
+          # Clean old local prod images (keep last 2)
           docker images --format "{{.Repository}}:{{.Tag}}" | \
-            grep "${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-" | \
+            grep "mood-classifier:prod-" | \
             tail -n +3 | \
             xargs -r docker rmi -f || true
 
-          # Удаляем старые test-with-pytest-* образы (оставляем последние 2)
+          # Clean old local test images (keep last 2)
           docker images --format "{{.Repository}}:{{.Tag}}" | \
-            grep "${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-" | \
+            grep "mood-classifier:test-" | \
             tail -n +3 | \
             xargs -r docker rmi -f || true
 
