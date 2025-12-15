@@ -84,7 +84,7 @@ jobs:
   # =============================================================================
   build-base-image:
     name: Build Base Image
-    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: self-hosted
     needs: [check-base-image]
     # Собираем если: Dockerfile.base изменился ИЛИ образа с нужным hash'ом нет в registry
     if: |
@@ -124,7 +124,7 @@ jobs:
   # =============================================================================
   build-prod-image:
     name: Build Prod Image
-    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: self-hosted
     needs: [check-base-image, build-base-image]
     if: always() && (needs.check-base-image.result == 'success')
     outputs:
@@ -237,7 +237,7 @@ jobs:
   # =============================================================================
   security:
     name: Security
-    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
         with:
@@ -422,7 +422,7 @@ jobs:
   # =============================================================================
   cleanup-registry:
     name: Cleanup Registry
-    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: self-hosted
     needs: cleanup-local-cache
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
@@ -454,7 +454,7 @@ jobs:
   # =============================================================================
   deploy:
     name: Deploy to VM
-    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: self-hosted
     needs: push-to-registry
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
