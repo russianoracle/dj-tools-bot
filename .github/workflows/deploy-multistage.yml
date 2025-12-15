@@ -55,7 +55,8 @@ jobs:
         run: |
           APP_BASE="${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }}"
 
-          if docker pull "$APP_BASE" 2>/dev/null; then
+          # Pull requires login (already done in previous step)
+          if docker pull "$APP_BASE"; then
             echo "✓ app-base exists in registry (using cached)"
           else
             echo "⚙️ app-base not found, building once..."
