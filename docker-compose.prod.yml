@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  app:
+    image: ${REGISTRY}/${REGISTRY_ID}/mood-classifier:latest
+    container_name: mood-classifier
+    restart: unless-stopped
+    volumes:
+      - mood-data:/data
+    environment:
+      - DATA_DIR=/data
+      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID}
+      - YC_FOLDER_ID=${YC_FOLDER_ID}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "mood-classifier"
+
+  fluent-bit:
+    image: cr.yandex/yc/fluent-bit-plugin-yandex:v1.0.4-fluent-bit-1.8.6
+    container_name: fluent-bit
+    restart: unless-stopped
+    environment:
+      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID}
+      - YC_FOLDER_ID=${YC_FOLDER_ID}
+      - YC_MESSAGE_QUEUE_URL=${YC_MESSAGE_QUEUE_URL:-}
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    depends_on:
+      - app
+    command: ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/fluent-bit.conf"]
+
+volumes:
+  mood-data:
+    external: true
