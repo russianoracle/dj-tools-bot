@@ -1,0 +1,37 @@
+# Example docker-compose.yml with persistent data
+
+version: '3.8'
+
+services:
+  mood-classifier:
+    build: .
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      # CRITICAL: Data volume - survives container updates
+      - mood-data:/data
+      # Optional: Redis for task queue
+      # - ./config:/app/config:ro
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  # Named volumes persist data independently from containers
+  mood-data:
+    driver: local
+  redis-data:
+    driver: local
+
+# Usage:
+#   1. Build: docker-compose build
+#   2. Start: docker-compose up -d
+#   3. Update code: docker-compose build && docker-compose up -d
+#      → Data in mood-data volume is NOT affected!
+#   4. View data: docker volume inspect mood-classifier_mood-data

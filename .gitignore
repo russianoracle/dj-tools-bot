@@ -11,11 +11,17 @@ __pycache__/
 venv/
 .venv/
 
-# Cache and data
+# Cache and data (NEVER commit user data!)
+# Production uses DATA_DIR env var to separate code from data
 cache/
 data/
+/data/
 downloads/
 *.log
+*.db
+*.db-journal
+dump.rdb
+backups/
 
 # IDE
 .DS_Store

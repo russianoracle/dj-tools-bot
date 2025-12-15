@@ -58,9 +58,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     && rm -rf /wheels
 
 # Создаём non-root user (security best practice)
+# + создаём /data для персистентного хранения
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/cache /app/downloads && \
-    chown -R appuser:appuser /app
+    mkdir -p /app/cache /app/downloads /data && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /data
 
 # Копируем код (Clean Architecture)
 # ВАЖНО: копируем только app/, БЕЗ src/, training/, experiments/
@@ -74,9 +76,11 @@ COPY --chown=appuser:appuser models/production/ ./models/production/
 USER appuser
 
 # Environment
+# DATA_DIR=/data - разделение code (обновляется) и data (персистентные)
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    DATA_DIR=/data
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \

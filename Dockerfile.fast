@@ -38,8 +38,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Создаём non-root user
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/cache /app/downloads && \
-    chown -R appuser:appuser /app
+    mkdir -p /app/cache /app/downloads /data && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /data
 
 # Копируем код
 COPY --chown=appuser:appuser app/ ./app/
@@ -52,7 +53,8 @@ USER appuser
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    DATA_DIR=/data
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import redis; r = redis.from_url('${REDIS_URL:-redis://redis:6379/0}'); r.ping()" || exit 1

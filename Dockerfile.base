@@ -50,6 +50,12 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Проверка
 RUN python -c "import numpy, scipy, sklearn, pandas, numba; print('✓ Scientific stack ready')"
 
+# Создать директорию для персистентных данных
+# В продакшене будет примонтирован Docker volume
+RUN mkdir -p /data && chmod 777 /data
+
+ENV DATA_DIR=/data
+
 # ============================================================================
 # Usage:
 # ============================================================================
