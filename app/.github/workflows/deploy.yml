@@ -378,12 +378,52 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
-  # STAGE 7: Cleanup Old Images в Registry
+  # STAGE 7: Cleanup Local Docker Cache (keep last 2 builds)
+  # =============================================================================
+  cleanup-local-cache:
+    name: Cleanup Local Cache
+    runs-on: self-hosted
+    needs: push-to-registry
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Clean old Docker images
+        run: |
+          echo "=== Cleaning old Docker images (keeping last 2) ==="
+
+          # Удаляем старые test-* образы (оставляем последние 2)
+          docker images --format "{{.Repository}}:{{.Tag}}" | \
+            grep "${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-" | \
+            tail -n +3 | \
+            xargs -r docker rmi -f || true
+
+          # Удаляем старые test-with-pytest-* образы (оставляем последние 2)
+          docker images --format "{{.Repository}}:{{.Tag}}" | \
+            grep "${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-" | \
+            tail -n +3 | \
+            xargs -r docker rmi -f || true
+
+          # Удаляем dangling images
+          docker image prune -f
+
+          echo "✓ Local cache cleanup complete"
+
+      - name: Clean old BuildKit cache
+        run: |
+          echo "=== Cleaning old BuildKit cache ==="
+
+          # Оставляем только последние файлы в кэше (по дате модификации)
+          find /tmp/.buildx-cache-prod -type f -mtime +7 -delete 2>/dev/null || true
+          find /tmp/.buildx-cache -type f -mtime +7 -delete 2>/dev/null || true
+
+          echo "✓ BuildKit cache cleanup complete"
+
+  # =============================================================================
+  # STAGE 8: Cleanup Old Images в Registry
   # =============================================================================
   cleanup-registry:
-    name: Cleanup Old Images
+    name: Cleanup Registry
     runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    needs: push-to-registry
+    needs: cleanup-local-cache
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Install yc CLI
