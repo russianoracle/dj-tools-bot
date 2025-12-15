@@ -1,0 +1,94 @@
+# ============================================================================
+# Multi-Stage Dockerfile for Fast Incremental Builds
+# Stages: base → application → test → production
+# ============================================================================
+#syntax=docker/dockerfile:1.4
+
+ARG PYTHON_VERSION=3.12
+ARG REGISTRY=cr.yandex
+ARG REGISTRY_ID=crp78hhr2t67jkeedad1
+
+# ============================================================================
+# STAGE 1: Base Dependencies (rarely changes)
+# Reuses pre-built python-scientific image with numpy, scipy, pandas
+# ============================================================================
+FROM ${REGISTRY}/${REGISTRY_ID}/python-scientific:${PYTHON_VERSION} AS base
+
+# This stage is almost always CACHED (base image rarely changes)
+
+# ============================================================================
+# STAGE 2: Application Code & Dependencies (changes often)
+# ============================================================================
+FROM base AS application
+
+WORKDIR /build
+
+# Install app-specific dependencies
+COPY requirements-prod-app.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install --no-cache-dir --prefer-binary -r requirements-prod-app.txt
+
+# Setup application directory
+WORKDIR /app
+
+# Copy installed packages
+COPY --from=application /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=application /usr/local/bin /usr/local/bin
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/cache /app/downloads /data && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /data
+
+# Copy application code (changes frequently)
+COPY --chown=appuser:appuser app/ ./app/
+
+# Copy models
+RUN mkdir -p ./models/production
+COPY --chown=appuser:appuser models/production/ ./models/production/
+
+# ============================================================================
+# STAGE 3: Test Environment (for CI/CD only)
+# Extends application with test dependencies
+# ============================================================================
+FROM application AS test
+
+# Install test dependencies
+RUN pip install --no-cache-dir \
+    pytest>=7.4.0 \
+    pytest-asyncio>=0.21.0 \
+    pytest-timeout>=2.1.0
+
+# Copy test files
+COPY --chown=appuser:appuser tests/ ./tests/
+
+# Switch to non-root user
+USER appuser
+
+# Default command runs tests
+CMD ["pytest", "tests/", "-vv", "--tb=short"]
+
+# ============================================================================
+# STAGE 4: Production (clean, without test dependencies)
+# ============================================================================
+FROM application AS production
+
+# Metadata
+LABEL org.opencontainers.image.source="https://github.com/russianoracle/dj-tools-bot"
+LABEL org.opencontainers.image.description="DJ Tools Bot - Mood Classifier"
+
+# Switch to non-root user
+USER appuser
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Production entrypoint
+CMD ["python", "-m", "app.main"]
