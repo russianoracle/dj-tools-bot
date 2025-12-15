@@ -8,7 +8,8 @@ services:
     env_file:
       - .env
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - DATA_DIR=/data
       - DOWNLOADS_DIR=/data/downloads
       - MAX_FILE_SIZE_MB=500
@@ -28,7 +29,7 @@ services:
         reservations:
           memory: 2G
     healthcheck:
-      test: ["CMD", "python", "-c", "import redis; r = redis.from_url('redis://redis:6379/0'); r.ping()"]
+      test: ["CMD", "python", "-c", "import redis; r = redis.Redis(host='redis', port=6379); r.ping()"]
       interval: 60s
       timeout: 10s
       retries: 3
@@ -42,7 +43,8 @@ services:
     env_file:
       - .env
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - DATA_DIR=/data
       - DOWNLOADS_DIR=/data/downloads
     volumes:
@@ -61,7 +63,7 @@ services:
         reservations:
           memory: 3G
     healthcheck:
-      test: ["CMD", "python", "-c", "from arq.connections import ArqRedis; import asyncio; asyncio.run(ArqRedis.from_url('redis://redis:6379').ping())"]
+      test: ["CMD", "python", "-c", "import redis; r = redis.Redis(host='redis', port=6379); r.ping()"]
       interval: 30s
       timeout: 10s
       retries: 3

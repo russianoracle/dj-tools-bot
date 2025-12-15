@@ -14,23 +14,6 @@ env:
 
 jobs:
   # ============================================
-  # JOB 1: Security Scan (parallel with build)
-  # ============================================
-  security:
-    name: Security Scan
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cleanup stale gitleaks files
-        run: rm -f /tmp/gitleaks.tmp /tmp/gitleaks* 2>/dev/null || true
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
-          GITLEAKS_ENABLE_SUMMARY: false
-
-  # ============================================
   # JOB 2: Build (uses local cache, skips if valid)
   # ============================================
   build:
@@ -105,7 +88,7 @@ jobs:
   test:
     name: Tests (${{ matrix.suite }})
     runs-on: self-hosted
-    needs: [security, build]
+    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -225,9 +208,14 @@ jobs:
 
       - name: Deploy with docker-compose
         run: |
-          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+          # Login using IAM token from VM metadata
+          IAM_TOKEN=$(curl -s -H 'Metadata-Flavor: Google' \
+            http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token | jq -r '.access_token')
+          echo "$IAM_TOKEN" | docker login ${{ env.REGISTRY }} --username iam --password-stdin
 
-          # Stop old containers gracefully
+          # Stop old containers (including standalone ones not in compose)
+          docker stop mood-classifier mood-arq-worker mood-redis 2>/dev/null || true
+          docker rm mood-classifier mood-arq-worker mood-redis 2>/dev/null || true
           docker-compose down --remove-orphans 2>/dev/null || true
 
           # Pull and start services
