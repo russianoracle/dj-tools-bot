@@ -145,6 +145,18 @@ jobs:
         run: |
           echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
+      - name: Pull base image if needed
+        run: |
+          # Проверяем есть ли базовый образ локально
+          BASE_IMAGE="${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}"
+
+          if docker image inspect "$BASE_IMAGE" >/dev/null 2>&1; then
+            echo "✓ Base image found in local cache"
+          else
+            echo "❌ Base image not in local cache, pulling from registry..."
+            docker pull "$BASE_IMAGE" || echo "⚠️ Failed to pull base image, will build from scratch"
+          fi
+
       - name: Decide which Dockerfile to use
         id: dockerfile
         run: |
