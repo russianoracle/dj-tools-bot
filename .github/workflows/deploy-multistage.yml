@@ -38,42 +38,28 @@ jobs:
           docker buildx inspect --bootstrap
 
   # ============================================
-  # JOB 2: Security Scan (parallel with build-and-test)
+  # JOB 2: Security Scan
   # ============================================
   security:
     name: Security Scan
     runs-on: self-hosted
-    # Run in parallel with build-and-test, no dependencies
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Install Gitleaks
-        run: |
-          if ! command -v gitleaks &> /dev/null; then
-            echo "📥 Installing gitleaks..."
-            wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
-            tar -xzf gitleaks_8.18.4_linux_x64.tar.gz -C /tmp
-            sudo mv /tmp/gitleaks /usr/local/bin/
-            rm gitleaks_8.18.4_linux_x64.tar.gz
-          fi
-          gitleaks version
-
-      - name: Run Gitleaks scan
-        continue-on-error: true
-        run: |
-          echo "🔍 Scanning for secrets..."
-          gitleaks detect --source . --verbose --no-git --exit-code 0
-          echo "✅ Security scan completed"
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+          GITLEAKS_ENABLE_SUMMARY: false
 
   # ============================================
-  # JOB 3: Build Test Image (ONCE, shared by all test jobs)
+  # JOB 3: Build & Test (LOCAL ONLY, NO PUSH)
   # ============================================
-  build-test-image:
-    name: Build Test Image
+  build-and-test:
+    name: Build & Test
     runs-on: self-hosted
-    needs: [setup-builder]
+    needs: [setup-builder, security]
     steps:
       - uses: actions/checkout@v4
 
@@ -91,15 +77,7 @@ jobs:
       - name: Pull base image for cache
         run: |
           BASE_IMAGE="${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}"
-
-          echo "🔄 Pulling latest base image: $BASE_IMAGE"
           docker pull "$BASE_IMAGE" 2>/dev/null || echo "⚠️ Base image pull failed, will build from scratch"
-
-          # Show base image creation date to verify freshness
-          if docker image inspect "$BASE_IMAGE" >/dev/null 2>&1; then
-            CREATED=$(docker inspect "$BASE_IMAGE" --format='{{.Created}}')
-            echo "📅 Base image created: $CREATED"
-          fi
 
       - name: Build test stage (includes app + test deps)
         run: |
@@ -119,60 +97,57 @@ jobs:
           echo "✓ Test image built and loaded to Docker daemon"
           docker images | grep mood-classifier
 
+      - name: Run unit tests
+        run: |
+          docker run --rm \
+            -v $(pwd)/tests:/app/tests \
+            mood-classifier:test-${{ github.sha }} \
+            pytest tests/ -m "unit" -vv --tb=short
+
+      - name: Run container dependency tests
+        run: |
+          docker run --rm \
+            -v $(pwd)/tests:/app/tests \
+            -e DATA_DIR=/data \
+            -e DOWNLOADS_DIR=/tmp/downloads \
+            mood-classifier:test-${{ github.sha }} \
+            pytest tests/test_ci_container.py -m "container" -vv --tb=short
+
+      - name: Start Redis for integration tests
+        run: |
+          docker run -d --name test-redis -p 6379:6379 redis:7-alpine
+          sleep 2
+
+      - name: Run integration tests with Redis
+        run: |
+          docker run --rm \
+            -v $(pwd)/tests:/app/tests \
+            --network host \
+            mood-classifier:test-${{ github.sha }} \
+            pytest tests/ -m "integration" -vv --tb=short
+
+      - name: Run pipeline tests (real audio)
+        run: |
+          docker run --rm \
+            -v $(pwd)/tests:/app/tests \
+            mood-classifier:test-${{ github.sha }} \
+            pytest tests/ -m "pipeline" -vv --tb=short
+
+      - name: Cleanup Redis
+        if: always()
+        run: docker rm -f test-redis || true
+
       - name: Logout from registry
         if: always()
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 4: Run Tests in Parallel (matrix strategy)
-  # ============================================
-  test:
-    name: Test (${{ matrix.test-type }})
-    runs-on: self-hosted
-    needs: [build-test-image]
-    strategy:
-      fail-fast: false  # Continue all tests even if one fails
-      matrix:
-        test-type: [unit, integration, analysis]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Start Redis (integration tests only)
-        if: matrix.test-type == 'integration'
-        run: |
-          docker run -d --name test-redis-${{ github.sha }} -p 6379:6379 redis:7-alpine
-          sleep 2
-
-      - name: Run ${{ matrix.test-type }} tests
-        run: |
-          echo "🧪 Running ${{ matrix.test-type }} tests..."
-
-          if [ "${{ matrix.test-type }}" = "integration" ]; then
-            # Integration tests need Redis access
-            docker run --rm \
-              -v $(pwd)/tests:/app/tests \
-              --network host \
-              mood-classifier:test-${{ github.sha }} \
-              pytest tests/ -m "${{ matrix.test-type }}" -vv --tb=short
-          else
-            # Unit and analysis tests run isolated
-            docker run --rm \
-              -v $(pwd)/tests:/app/tests \
-              mood-classifier:test-${{ github.sha }} \
-              pytest tests/ -m "${{ matrix.test-type }}" -vv --tb=short
-          fi
-
-      - name: Cleanup Redis
-        if: always() && matrix.test-type == 'integration'
-        run: docker rm -f test-redis-${{ github.sha }} || true
-
-  # ============================================
-  # JOB 5: Build & Push Production (AFTER TESTS + SECURITY)
+  # JOB 4: Build & Push Production (AFTER TESTS)
   # ============================================
   push-production:
     name: Push Production Image
     runs-on: self-hosted
-    needs: [test, security]  # Wait for ALL tests (matrix) AND security
+    needs: build-and-test
     if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
@@ -207,73 +182,50 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 6: Deploy to Production (Local)
+  # JOB 5: Deploy to Production VM
   # ============================================
   deploy:
-    name: Deploy Locally
+    name: Deploy to VM
     runs-on: self-hosted
     needs: push-production
     if: success()
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Prepare deployment directory
+      - name: Deploy to production VM
         run: |
-          sudo mkdir -p /opt/mood-classifier
-          sudo chown -R $USER:$USER /opt/mood-classifier
+          echo "🚀 Deploying to production VM: 158.160.122.216"
 
-      - name: Copy deployment files
-        run: |
-          cp docker-compose.prod.yml /opt/mood-classifier/
-          cp fluent-bit.conf /opt/mood-classifier/
+          ssh -o StrictHostKeyChecking=no ubuntu@158.160.122.216 << 'EOF'
+            # Login to registry
+            echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
-      - name: Deploy production stack
-        run: |
-          echo "🚀 Deploying production stack locally"
-          cd /opt/mood-classifier
+            # Pull latest image
+            docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
-          # Login to registry
-          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+            # Stop old container
+            docker stop mood-classifier 2>/dev/null || true
+            docker rm mood-classifier 2>/dev/null || true
 
-          # Create volume if not exists
-          docker volume create mood-data 2>/dev/null || true
+            # Start new container
+            docker run -d \
+              --name mood-classifier \
+              --restart unless-stopped \
+              -v /data:/data \
+              -e DATA_DIR=/data \
+              ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
-          # Stop and remove old containers (including orphans)
-          docker-compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
-
-          # Force remove any lingering containers with same names
-          docker rm -f mood-classifier mood-arq-worker mood-redis fluent-bit 2>/dev/null || true
-
-          # Pull latest image
-          REGISTRY=${{ env.REGISTRY }} \
-          REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
-          YC_LOG_GROUP_ID=${{ secrets.YC_LOG_GROUP_ID }} \
-          YC_FOLDER_ID=${{ secrets.YC_FOLDER_ID }} \
-          docker-compose -f docker-compose.prod.yml pull
-
-          # Start services (app + arq-worker + redis + fluent-bit)
-          REGISTRY=${{ env.REGISTRY }} \
-          REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
-          YC_LOG_GROUP_ID=${{ secrets.YC_LOG_GROUP_ID }} \
-          YC_FOLDER_ID=${{ secrets.YC_FOLDER_ID }} \
-          docker-compose -f docker-compose.prod.yml up -d
-
-          # Verify deployment
-          sleep 5
-          docker-compose -f docker-compose.prod.yml ps
-          echo "✓ Deployment successful (app + arq-worker + redis + fluent-bit)"
-
-      - name: Logout from registry
-        if: always()
-        run: docker logout ${{ env.REGISTRY }}
+            # Verify deployment
+            sleep 5
+            docker ps | grep mood-classifier
+            echo "✓ Deployment successful"
+          EOF
 
   # ============================================
-  # JOB 7: Cleanup Local Cache
+  # JOB 6: Cleanup Local Cache
   # ============================================
   cleanup:
     name: Cleanup Local Cache
     runs-on: self-hosted
-    needs: [deploy]
+    needs: [push-production]
     if: always()
     steps:
       - name: Clean old local test images
@@ -305,7 +257,7 @@ jobs:
           fi
 
   # ============================================
-  # JOB 8: Cleanup Old Registry Images
+  # JOB 7: Cleanup Old Registry Images
   # ============================================
   cleanup-registry:
     name: Cleanup Registry

@@ -104,6 +104,15 @@ jobs:
             mood-classifier:test-${{ github.sha }} \
             pytest tests/ -m "unit" -vv --tb=short
 
+      - name: Run container dependency tests
+        run: |
+          docker run --rm \
+            -v $(pwd)/tests:/app/tests \
+            -e DATA_DIR=/data \
+            -e DOWNLOADS_DIR=/tmp/downloads \
+            mood-classifier:test-${{ github.sha }} \
+            pytest tests/test_ci_container.py -m "container" -vv --tb=short
+
       - name: Start Redis for integration tests
         run: |
           docker run -d --name test-redis -p 6379:6379 redis:7-alpine
