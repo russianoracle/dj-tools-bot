@@ -177,6 +177,42 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
+  # STAGE 1D: Build Test Image (extends prod image with pytest)
+  # =============================================================================
+  build-test-image:
+    name: Build Test Image
+    runs-on: self-hosted
+    needs: [build-prod-image]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Yandex Container Registry
+        run: |
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+
+      - name: Build and push test image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.test
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-buildcache,mode=max
+          build-args: |
+            REGISTRY=${{ env.REGISTRY }}
+            REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
+            IMAGE_NAME=${{ env.IMAGE_NAME }}
+            IMAGE_TAG=test-${{ github.sha }}
+
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
+
+  # =============================================================================
   # STAGE 2: Security Scan (параллельно с build)
   # =============================================================================
   security:
@@ -199,8 +235,8 @@ jobs:
   # =============================================================================
   test-unit:
     name: Unit Tests
-    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    needs: [build-prod-image]
+    runs-on: self-hosted
+    needs: [build-test-image]
     steps:
       - uses: actions/checkout@v4
 
@@ -208,13 +244,13 @@ jobs:
         run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
       - name: Pull test image
-        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
 
       - name: Run unit tests in container
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
             pytest tests/ -m "unit" -vv --tb=short || true
 
       - name: Logout
@@ -226,8 +262,8 @@ jobs:
   # =============================================================================
   test-integration-redis:
     name: Integration Tests (Redis)
-    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    needs: [build-prod-image]
+    runs-on: self-hosted
+    needs: [build-test-image]
     services:
       redis:
         image: redis:7-alpine
@@ -246,7 +282,7 @@ jobs:
         run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
       - name: Pull test image
-        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
 
       - name: Run bot component tests
         run: |
@@ -254,7 +290,7 @@ jobs:
             --network host \
             -e REDIS_URL=redis://localhost:6379/0 \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
             pytest tests/test_ci_bot.py -vv --tb=short
 
       - name: Run Redis cache integration tests
@@ -263,7 +299,7 @@ jobs:
             --network host \
             -e REDIS_URL=redis://localhost:6379/0 \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
             pytest tests/test_ci_cache_redis.py -vv --tb=short
 
       - name: Logout
@@ -275,8 +311,8 @@ jobs:
   # =============================================================================
   test-pipelines:
     name: Pipeline Tests (Real Audio)
-    runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    needs: [build-prod-image]
+    runs-on: self-hosted
+    needs: [build-test-image]
     steps:
       - uses: actions/checkout@v4
 
@@ -284,7 +320,7 @@ jobs:
         run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
       - name: Pull test image
-        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
 
       - name: Verify test audio files exist
         run: |
@@ -297,14 +333,14 @@ jobs:
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
             pytest tests/test_ci_pipelines.py::TestTrackAnalysisPipeline -vv --tb=short
 
       - name: Run SetAnalysisPipeline tests
         run: |
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
             pytest tests/test_ci_pipelines.py::TestSetAnalysisPipeline -vv --tb=short
 
       - name: Logout

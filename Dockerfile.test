@@ -1,0 +1,22 @@
+# ============================================================================
+# Test Image - extends production image with test dependencies
+# ============================================================================
+
+ARG REGISTRY=cr.yandex
+ARG REGISTRY_ID
+ARG IMAGE_NAME=mood-classifier
+ARG IMAGE_TAG
+
+FROM ${REGISTRY}/${REGISTRY_ID}/${IMAGE_NAME}:${IMAGE_TAG}
+
+# Install test dependencies
+RUN pip install --no-cache-dir \
+    pytest>=7.4.0 \
+    pytest-asyncio>=0.21.0 \
+    pytest-timeout>=2.1.0
+
+# Set working directory
+WORKDIR /app
+
+# Default command for running tests
+CMD ["pytest", "tests/", "-vv"]
