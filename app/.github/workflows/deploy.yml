@@ -38,29 +38,33 @@ jobs:
           docker buildx inspect --bootstrap
 
   # ============================================
-  # JOB 2: Security Scan (non-blocking)
+  # JOB 2: Security Scan
   # ============================================
   security:
     name: Security Scan
     runs-on: self-hosted
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Cleanup old gitleaks files
-        run: rm -f /tmp/gitleaks.tmp /tmp/gitleaks* || true
+      - name: Install Gitleaks
+        run: |
+          if ! command -v gitleaks &> /dev/null; then
+            echo "📥 Installing gitleaks..."
+            wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
+            tar -xzf gitleaks_8.18.4_linux_x64.tar.gz -C /tmp
+            sudo mv /tmp/gitleaks /usr/local/bin/
+            rm gitleaks_8.18.4_linux_x64.tar.gz
+          fi
+          gitleaks version
 
-      - name: Run Gitleaks
+      - name: Run Gitleaks scan
         continue-on-error: true
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
-          GITLEAKS_ENABLE_SUMMARY: false
-
-      - name: Cleanup after scan
-        if: always()
-        run: rm -f /tmp/gitleaks.tmp /tmp/gitleaks* || true
+        run: |
+          echo "🔍 Scanning for secrets..."
+          gitleaks detect --source . --verbose --no-git --exit-code 0
+          echo "✅ Security scan completed"
 
   # ============================================
   # JOB 3: Build & Test (LOCAL ONLY, NO PUSH)

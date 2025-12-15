@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: mood-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   app:
     image: ${REGISTRY}/${REGISTRY_ID}/mood-classifier:latest
     container_name: mood-classifier
@@ -9,8 +22,13 @@ services:
       - mood-data:/data
     environment:
       - DATA_DIR=/data
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID}
       - YC_FOLDER_ID=${YC_FOLDER_ID}
+    depends_on:
+      redis:
+        condition: service_healthy
     logging:
       driver: json-file
       options:
@@ -37,3 +55,4 @@ services:
 volumes:
   mood-data:
     external: true
+  redis-data:
