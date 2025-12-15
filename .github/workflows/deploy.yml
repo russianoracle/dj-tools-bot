@@ -248,25 +248,17 @@ jobs:
     name: Unit Tests
     runs-on: self-hosted
     needs: [build-test-image]
+    if: always() && (needs.build-test-image.result == 'success')
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login to registry
-        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
-
-      - name: Pull test image
-        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
-
       - name: Run unit tests in container
         run: |
+          # Образ уже на runner после build-test-image (локальный кэш)
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
-            pytest tests/ -m "unit" -vv --tb=short || true
-
-      - name: Logout
-        if: always()
-        run: docker logout ${{ env.REGISTRY }}
+            pytest tests/ -m "unit" -vv --tb=short
 
   # =============================================================================
   # STAGE 4: Integration Tests с Redis (использует Docker image)
@@ -275,6 +267,7 @@ jobs:
     name: Integration Tests (Redis)
     runs-on: self-hosted
     needs: [build-test-image]
+    if: always() && (needs.build-test-image.result == 'success')
     services:
       redis:
         image: redis:7-alpine
@@ -289,14 +282,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login to registry
-        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
-
-      - name: Pull test image
-        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
-
       - name: Run bot component tests
         run: |
+          # Образ уже на runner после build-test-image (локальный кэш)
           docker run --rm \
             --network host \
             -e REDIS_URL=redis://localhost:6379/0 \
@@ -313,10 +301,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
             pytest tests/test_ci_cache_redis.py -vv --tb=short
 
-      - name: Logout
-        if: always()
-        run: docker logout ${{ env.REGISTRY }}
-
   # =============================================================================
   # STAGE 5: Pipeline Tests (использует Docker image)
   # =============================================================================
@@ -324,14 +308,9 @@ jobs:
     name: Pipeline Tests (Real Audio)
     runs-on: self-hosted
     needs: [build-test-image]
+    if: always() && (needs.build-test-image.result == 'success')
     steps:
       - uses: actions/checkout@v4
-
-      - name: Login to registry
-        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
-
-      - name: Pull test image
-        run: docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
 
       - name: Verify test audio files exist
         run: |
@@ -342,6 +321,7 @@ jobs:
 
       - name: Run TrackAnalysisPipeline tests
         run: |
+          # Образ уже на runner после build-test-image (локальный кэш)
           docker run --rm \
             -v $(pwd)/tests:/app/tests \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
@@ -353,10 +333,6 @@ jobs:
             -v $(pwd)/tests:/app/tests \
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }} \
             pytest tests/test_ci_pipelines.py::TestSetAnalysisPipeline -vv --tb=short
-
-      - name: Logout
-        if: always()
-        run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
   # STAGE 6: Push Production Image (REUSE test image, no rebuild!)
