@@ -258,7 +258,7 @@ jobs:
   cleanup:
     name: Cleanup Local Cache
     runs-on: self-hosted
-    needs: [push-production]
+    needs: [deploy]
     if: always()
     steps:
       - name: Clean old local test images
