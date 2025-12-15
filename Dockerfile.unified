@@ -48,8 +48,8 @@ COPY --chown=appuser:appuser models/production/ ./models/production/
 # ============================================================================
 FROM application AS test
 
-# Install test dependencies
-RUN pip install --no-cache-dir \
+# Install test dependencies (suppress pip root warning in CI)
+RUN pip install --no-cache-dir --root-user-action=ignore \
     pytest>=7.4.0 \
     pytest-asyncio>=0.21.0 \
     pytest-timeout>=2.1.0
