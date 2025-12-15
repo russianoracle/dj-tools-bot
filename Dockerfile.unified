@@ -21,20 +21,13 @@ FROM ${REGISTRY}/${REGISTRY_ID}/python-scientific:${PYTHON_VERSION} AS base
 # ============================================================================
 FROM base AS application
 
-WORKDIR /build
+WORKDIR /app
 
 # Install app-specific dependencies
 COPY requirements-prod-app.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
     pip install --no-cache-dir --prefer-binary -r requirements-prod-app.txt
-
-# Setup application directory
-WORKDIR /app
-
-# Copy installed packages
-COPY --from=application /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=application /usr/local/bin /usr/local/bin
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
