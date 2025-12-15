@@ -32,21 +32,52 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       needs-rebuild: ${{ steps.check.outputs.needs-rebuild }}
+      deps-hash: ${{ steps.check.outputs.deps-hash }}
+      base-exists: ${{ steps.check-registry.outputs.exists }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Check if base image files changed
+      - name: Calculate dependencies hash
         id: check
         run: |
-          if git diff --name-only HEAD~1 HEAD | grep -E '^(Dockerfile\.base|requirements-prod\.txt)$'; then
+          # Вычисляем hash зависимостей базового образа
+          DEPS_HASH=$(grep -E '(numpy|scipy|scikit-learn|pandas|numba|essentia-tensorflow)' Dockerfile.base | md5sum | cut -d' ' -f1)
+          echo "deps-hash=$DEPS_HASH" >> $GITHUB_OUTPUT
+          echo "📊 Base image dependencies hash: $DEPS_HASH"
+
+          # Проверяем изменился ли Dockerfile.base
+          if git diff --name-only HEAD~1 HEAD | grep -E '^(Dockerfile\.base)$'; then
             echo "needs-rebuild=true" >> $GITHUB_OUTPUT
-            echo "📦 Base image files changed - rebuild required"
+            echo "📦 Dockerfile.base changed - rebuild required"
           else
             echo "needs-rebuild=false" >> $GITHUB_OUTPUT
-            echo "✓ Base image unchanged - using existing"
+            echo "✓ Dockerfile.base unchanged"
           fi
+
+      - name: Login to registry
+        run: |
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+
+      - name: Check if base image exists in registry
+        id: check-registry
+        run: |
+          DEPS_HASH="${{ steps.check.outputs.deps-hash }}"
+          echo "🔍 Checking registry for base image with hash: $DEPS_HASH"
+
+          # Пытаемся pull образ с hash'ом зависимостей
+          if docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}-$DEPS_HASH 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✓ Base image with matching dependencies found"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "❌ Base image not found - will need to build"
+          fi
+
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
 
   # =============================================================================
   # STAGE 1B: Build base image if needed
@@ -55,7 +86,10 @@ jobs:
     name: Build Base Image
     runs-on: ${{ github.event.inputs.use_selfhosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     needs: [check-base-image]
-    if: needs.check-base-image.outputs.needs-rebuild == 'true'
+    # Собираем если: Dockerfile.base изменился ИЛИ образа с нужным hash'ом нет в registry
+    if: |
+      needs.check-base-image.outputs.needs-rebuild == 'true' ||
+      needs.check-base-image.outputs.base-exists == 'false'
     steps:
       - uses: actions/checkout@v4
 
@@ -74,6 +108,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}
+            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }}-${{ needs.check-base-image.outputs.deps-hash }}
             ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:latest
           cache-from: type=gha,scope=base
           cache-to: type=gha,mode=max,scope=base
@@ -113,12 +148,13 @@ jobs:
       - name: Decide which Dockerfile to use
         id: dockerfile
         run: |
-          if [ "${{ needs.check-base-image.outputs.needs-rebuild }}" == "true" ] || docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/python-scientific:${{ env.PYTHON_VERSION }} 2>/dev/null; then
+          # Используем fast если базовый образ существует ИЛИ был только что собран
+          if [ "${{ needs.check-base-image.outputs.base-exists }}" == "true" ] || [ "${{ needs.build-base-image.result }}" == "success" ]; then
             echo "file=Dockerfile.fast" >> $GITHUB_OUTPUT
             echo "📦 Using Dockerfile.fast (with base image)"
           else
             echo "file=Dockerfile" >> $GITHUB_OUTPUT
-            echo "📦 Using Dockerfile (standalone - base image not available)"
+            echo "📦 Using Dockerfile (standalone)"
           fi
 
       - name: Build and push test image
