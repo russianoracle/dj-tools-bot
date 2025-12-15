@@ -226,8 +226,11 @@ jobs:
           # Create volume if not exists
           docker volume create mood-data 2>/dev/null || true
 
-          # Stop and remove old containers
-          docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+          # Stop and remove old containers (including orphans)
+          docker-compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+
+          # Force remove any lingering containers with same names
+          docker rm -f mood-classifier mood-arq-worker mood-redis fluent-bit 2>/dev/null || true
 
           # Pull latest image
           REGISTRY=${{ env.REGISTRY }} \
