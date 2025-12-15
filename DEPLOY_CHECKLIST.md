@@ -3,9 +3,11 @@
 ## ✅ Pre-Deploy
 
 - [ ] Установить `DATA_DIR=/data` в production environment
-- [ ] Создать Docker volume для данных
-- [ ] Сделать бэкап текущей БД (если есть)
+- [ ] Создать Docker volumes: `mood_data`, `redis_data`, `downloads_data`
+- [ ] Сделать бэкап текущей БД (если есть): `make backup-db`
+- [ ] Сделать бэкап Redis (если есть активные задачи)
 - [ ] Проверить requirements.txt (БЕЗ pyrekordbox!)
+- [ ] Проверить что Redis использует AOF: `--appendonly yes`
 
 ## ✅ Deploy
 
@@ -26,7 +28,9 @@ docker-compose logs -f
 ## ✅ Post-Deploy
 
 - [ ] Проверить что БД доступна: `docker exec <container> ls -lh /data/predictions.db`
-- [ ] Проверить количество треков в кеше
+- [ ] Проверить Redis AOF: `docker exec redis redis-cli INFO persistence`
+- [ ] Проверить очередь ARQ: `docker exec redis redis-cli LLEN arq:queue:default`
+- [ ] Проверить количество треков в кеше: `make cache-stats`
 - [ ] Протестировать генерацию сета
 - [ ] Проверить Telegram bot (если используется)
 

@@ -10,12 +10,13 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - ADMIN_USER_ID=${ADMIN_USER_ID}
       - REDIS_URL=redis://redis:6379/0
-      - CACHE_DIR=/app/cache
+      - DATA_DIR=/data
       - DOWNLOADS_DIR=/app/downloads
       - MAX_FILE_SIZE_MB=500
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
-      - cache_data:/app/cache
+      # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
+      - mood_data:/data
       - downloads_data:/app/downloads
     depends_on:
       redis:
@@ -43,11 +44,12 @@ services:
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - CACHE_DIR=/app/cache
+      - DATA_DIR=/data
       - DOWNLOADS_DIR=/app/downloads
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
-      - cache_data:/app/cache
+      # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
+      - mood_data:/data
       - downloads_data:/app/downloads
     depends_on:
       redis:
@@ -71,8 +73,11 @@ services:
     image: redis:7-alpine
     container_name: mood-classifier-redis
     restart: unless-stopped
+    # ВАЖНО: --appendonly yes для персистентности очереди задач
+    # При рестарте контейнера ARQ задачи НЕ теряются
     command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
     volumes:
+      # КРИТИЧНО: Redis AOF файлы в volume (задачи не теряются при обновлении)
       - redis_data:/data
     networks:
       - app-network
@@ -84,9 +89,13 @@ services:
       start_period: 5s
 
 volumes:
-  cache_data:
+  # КРИТИЧНО: Персистентные данные (выживают при обновлении контейнеров)
+  mood_data:
+    # БД (predictions.db), STFT кеш, features кеш
   downloads_data:
+    # Временные загрузки пользователей
   redis_data:
+    # Redis persistence (AOF) - очередь задач ARQ
 
 networks:
   app-network:
