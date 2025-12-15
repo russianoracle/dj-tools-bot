@@ -183,6 +183,7 @@ jobs:
     name: Build Test Image
     runs-on: self-hosted
     needs: [build-prod-image]
+    if: always() && (needs.build-prod-image.result == 'success')
     steps:
       - uses: actions/checkout@v4
 
