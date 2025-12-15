@@ -23,6 +23,11 @@ FROM base AS application
 
 WORKDIR /app
 
+# Install yt-dlp and ffmpeg for audio downloads
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && \
+    pip install --no-cache-dir yt-dlp && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Install app-specific dependencies
 COPY requirements-prod-app.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
