@@ -190,11 +190,22 @@ jobs:
     needs: push-production
     if: success()
     steps:
+      - name: Setup SSH key
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H 158.160.122.216 >> ~/.ssh/known_hosts
+
       - name: Deploy to production VM
+        env:
+          YC_SA_KEY: ${{ secrets.YC_SA_JSON_KEY }}
         run: |
           echo "🚀 Deploying to production VM: 158.160.122.216"
 
-          ssh -o StrictHostKeyChecking=no ubuntu@158.160.122.216 << 'EOF'
+          ssh -i ~/.ssh/deploy_key ubuntu@158.160.122.216 << 'EOF'
             # Login to registry
             echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
 
@@ -218,6 +229,10 @@ jobs:
             docker ps | grep mood-classifier
             echo "✓ Deployment successful"
           EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
   # ============================================
   # JOB 6: Cleanup Local Cache
