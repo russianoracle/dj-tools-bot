@@ -164,8 +164,13 @@ jobs:
           file: ./${{ steps.dockerfile.outputs.file }}
           push: true
           tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache
+            type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
+            type=local,src=/tmp/.buildx-cache-prod
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+            type=local,dest=/tmp/.buildx-cache-prod,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             PYTHON_VERSION=${{ env.PYTHON_VERSION }}
@@ -201,8 +206,13 @@ jobs:
           file: ./Dockerfile.test
           push: true
           tags: ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-with-pytest-${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-buildcache,mode=max
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-buildcache
+            type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
+            type=local,src=/tmp/.buildx-cache
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:test-buildcache,mode=max
+            type=local,dest=/tmp/.buildx-cache,mode=max
           build-args: |
             REGISTRY=${{ env.REGISTRY }}
             REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
