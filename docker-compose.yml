@@ -2,18 +2,16 @@ version: "3.9"
 
 services:
   bot:
-    build: .
-    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID}/mood-classifier:${TAG:-latest}
-    container_name: mood-classifier-bot
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/mood-classifier:${TAG:-latest}
+    container_name: mood-classifier
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - ADMIN_USER_ID=${ADMIN_USER_ID}
       - REDIS_URL=redis://redis:6379/0
       - DATA_DIR=/data
-      - DOWNLOADS_DIR=/app/downloads
+      - DOWNLOADS_DIR=/data/downloads
       - MAX_FILE_SIZE_MB=500
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
       - mood_data:/data
@@ -37,16 +35,16 @@ services:
       start_period: 10s
 
   worker:
-    build: .
-    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID}/mood-classifier:${TAG:-latest}
-    container_name: mood-classifier-worker
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/mood-classifier:${TAG:-latest}
+    container_name: mood-arq-worker
     command: arq app.services.arq_worker.WorkerSettings
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
       - DATA_DIR=/data
-      - DOWNLOADS_DIR=/app/downloads
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DOWNLOADS_DIR=/data/downloads
     volumes:
       # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
       - mood_data:/data
@@ -71,7 +69,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: mood-classifier-redis
+    container_name: mood-redis
     restart: unless-stopped
     # ВАЖНО: --appendonly yes для персистентности очереди задач
     # При рестарте контейнера ARQ задачи НЕ теряются

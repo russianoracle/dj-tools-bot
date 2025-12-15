@@ -200,29 +200,49 @@ jobs:
         run: docker logout ${{ env.REGISTRY }}
 
   # ============================================
-  # JOB 5: Deploy (same machine as runner)
+  # JOB 5: Deploy (docker-compose + Lockbox)
   # ============================================
   deploy:
     name: Deploy
     runs-on: self-hosted
     needs: push
     steps:
-      - name: Deploy production container
+      - uses: actions/checkout@v4
+
+      - name: Fetch secrets from Lockbox
+        run: |
+          # Fetch secrets and create .env file for docker-compose
+          SECRET_ID="e6qrhl953e11s6flf61n"
+          /opt/yc/bin/yc lockbox payload get --id "$SECRET_ID" --format json | \
+            jq -r '.entries[] | "\(.key | ascii_upcase)=\(.text_value)"' > .env
+
+          # Add registry vars for docker-compose
+          echo "REGISTRY=${{ env.REGISTRY }}" >> .env
+          echo "REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}" >> .env
+          echo "TAG=latest" >> .env
+
+          echo "✓ Secrets fetched from Lockbox"
+
+      - name: Deploy with docker-compose
         run: |
           echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
-          docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-          docker stop mood-classifier 2>/dev/null || true
-          docker rm mood-classifier 2>/dev/null || true
-          docker run -d \
-            --name mood-classifier \
-            --restart unless-stopped \
-            -v /data:/data \
-            -e DATA_DIR=/data \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-          sleep 3
-          docker ps | grep mood-classifier
+
+          # Stop old containers gracefully
+          docker-compose down --remove-orphans 2>/dev/null || true
+
+          # Pull and start services
+          docker-compose pull
+          docker-compose up -d
+
+          # Wait for services to start
+          sleep 5
+          docker-compose ps
+          docker-compose logs --tail=20 bot
+
+          # Cleanup
+          rm -f .env
           docker logout ${{ env.REGISTRY }}
-          echo "✓ Deployed"
+          echo "✓ Deployed with docker-compose"
 
   # ============================================
   # JOB 6: Cleanup
