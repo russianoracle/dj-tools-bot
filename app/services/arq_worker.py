@@ -579,13 +579,74 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
         }
 
 
-def get_job_status(job_id: str) -> Dict[str, Any]:
-    """Get job status from in-memory storage."""
-    return _job_results.get(job_id, {
-        "state": "PENDING",
-        "progress": 0,
-        "status": "Waiting in queue...",
-    })
+async def get_job_status(job_id: str) -> Dict[str, Any]:
+    """Get job status from Redis (ARQ result)."""
+    try:
+        pool = await get_redis_pool()
+        job = await pool.job(job_id)
+        if job is None:
+            return {
+                "state": "PENDING",
+                "progress": 0,
+                "status": "Waiting in queue...",
+            }
+
+        # Get job info
+        info = await job.info()
+        if info is None:
+            return {
+                "state": "PENDING",
+                "progress": 0,
+                "status": "Waiting in queue...",
+            }
+
+        # Map ARQ status to our format
+        from arq.jobs import JobStatus
+        if info.status == JobStatus.complete:
+            result = await job.result()
+            if isinstance(result, dict):
+                if result.get("status") == "failed":
+                    return {
+                        "state": "FAILURE",
+                        "progress": 0,
+                        "status": f"❌ {result.get('error', 'Unknown error')[:100]}",
+                    }
+                return {
+                    "state": "SUCCESS",
+                    "progress": 100,
+                    "status": "✅ Completed",
+                    "result": result.get("result", {}),
+                }
+            return {
+                "state": "SUCCESS",
+                "progress": 100,
+                "status": "✅ Completed",
+            }
+        elif info.status == JobStatus.in_progress:
+            return {
+                "state": "PROGRESS",
+                "progress": 50,
+                "status": "🔄 Processing...",
+            }
+        elif info.status == JobStatus.deferred:
+            return {
+                "state": "PENDING",
+                "progress": 0,
+                "status": "⏳ Scheduled...",
+            }
+        else:
+            return {
+                "state": "PENDING",
+                "progress": 0,
+                "status": "Waiting in queue...",
+            }
+    except Exception as e:
+        logger.warning(f"Failed to get job status: {e}")
+        return {
+            "state": "UNKNOWN",
+            "progress": 0,
+            "status": f"Status unavailable: {str(e)[:50]}",
+        }
 
 
 # ARQ Worker class

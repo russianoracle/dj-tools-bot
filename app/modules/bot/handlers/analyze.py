@@ -210,7 +210,7 @@ async def cb_my_jobs(callback: CallbackQuery):
     # Build jobs list with status
     lines = []
     for job_id in user_jobs[user_id][-5:]:
-        status = get_job_status(job_id)
+        status = await get_job_status(job_id)
         emoji = get_state_emoji(status["state"])
         short_id = job_id[:15] + "..." if len(job_id) > 15 else job_id
         lines.append(f"{emoji} <code>{short_id}</code>\n   └ {status['status']}")
@@ -229,7 +229,7 @@ async def cb_my_jobs(callback: CallbackQuery):
 async def cb_job_detail(callback: CallbackQuery):
     """Show job details with progress bar and ETA."""
     job_id = callback.data.split(":", 1)[1]
-    status = get_job_status(job_id)
+    status = await get_job_status(job_id)
     emoji = get_state_emoji(status["state"])
 
     # Progress bar with ETA
