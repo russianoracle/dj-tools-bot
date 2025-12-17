@@ -256,7 +256,6 @@ If worker uses >6GB memory:
 ## Contributing
 
 ### Code Style
-- Follow CLAUDE.md guidelines
 - Use STFTCache for all librosa operations
 - Write vectorized numpy code (no loops)
 - Add tests for new features

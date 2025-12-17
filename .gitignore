@@ -30,8 +30,7 @@ backups/
 
 # Training and development (should never be in deploy repo)
 training/
-scripts/
 experiments/
 
 # NOTE: tests/ is INCLUDED for CI/CD integration tests
-# Only test_ci_*.py files are copied, not the full test suite
+# NOTE: scripts/ is INCLUDED for production deployment scripts (fetch-secrets.sh)
