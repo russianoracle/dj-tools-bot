@@ -126,6 +126,7 @@ services:
       - .env
     environment:
       - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
+      - YC_IAM_TOKEN=${YC_IAM_TOKEN:-}
     volumes:
       - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
       - ./parsers.conf:/fluent-bit/etc/parsers.conf:ro
