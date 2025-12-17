@@ -243,7 +243,7 @@ jobs:
           # Use fetch-secrets.sh script (has built-in defaults)
           if [ -f "./scripts/fetch-secrets.sh" ]; then
             chmod +x ./scripts/fetch-secrets.sh
-            ./scripts/fetch-secrets.sh --env-file /opt/mood-classifier/.env
+            ./scripts/fetch-secrets.sh --env-file /home/ubuntu/app/.env
           else
             echo "ERROR: scripts/fetch-secrets.sh not found"
             exit 1
@@ -273,7 +273,7 @@ jobs:
             --restart unless-stopped \
             --network host \
             -v mood-data:/data \
-            --env-file /opt/mood-classifier/.env \
+            --env-file /home/ubuntu/app/.env \
             --health-cmd="python -c 'import sys; sys.exit(0)'" \
             --health-interval=30s \
             --health-timeout=10s \
@@ -288,7 +288,7 @@ jobs:
             --restart unless-stopped \
             --network host \
             -v mood-data:/data \
-            --env-file /opt/mood-classifier/.env \
+            --env-file /home/ubuntu/app/.env \
             --health-cmd="python -c 'import sys; sys.exit(0)'" \
             --health-interval=30s \
             --health-timeout=10s \
