@@ -9,6 +9,7 @@ on:
 
 env:
   REGISTRY: cr.yandex
+  REGISTRY_ID: crp78hhr2t67jkeedad1
   IMAGE_NAME: mood-classifier
   PYTHON_VERSION: "3.12"
   SHARED_BUILDER: ci-shared-builder
@@ -82,12 +83,12 @@ jobs:
 
       - name: Pull previous image for layer cache
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest 2>/dev/null || \
+          docker pull ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest 2>/dev/null || \
           echo "No previous image, building from scratch"
 
       - name: Pull base image for cache
         run: |
-          BASE_IMAGE="${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }}"
+          BASE_IMAGE="${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }}"
           docker pull "$BASE_IMAGE" 2>/dev/null || echo "Base image pull failed, will build from scratch"
 
       - name: Build test stage (includes app + test deps)
@@ -97,8 +98,8 @@ jobs:
             --target test \
             --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
             --build-arg REGISTRY=${{ env.REGISTRY }} \
-            --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
-            --cache-from type=registry,ref=${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
+            --build-arg REGISTRY_ID=${{ env.REGISTRY_ID }} \
+            --cache-from type=registry,ref=${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache,mode=max \
             --output type=docker,name=mood-classifier:test-${{ github.sha }} \
@@ -178,11 +179,11 @@ jobs:
             --target production \
             --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
             --build-arg REGISTRY=${{ env.REGISTRY }} \
-            --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
+            --build-arg REGISTRY_ID=${{ env.REGISTRY_ID }} \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --push \
-            -t ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -t ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
             --file Dockerfile.unified \
             .
 
@@ -252,8 +253,8 @@ jobs:
         run: |
           echo "=== Deploying containers ==="
 
-          # Pull new image
-          docker pull ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
+          # Pull new image (YC registry only, no Docker Hub fallback)
+          docker pull ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
           # Stop and remove old containers
           docker stop mood-classifier mood-arq-worker 2>/dev/null || true
@@ -271,7 +272,7 @@ jobs:
             --health-timeout=10s \
             --health-start-period=10s \
             --health-retries=3 \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
             python -m app.main
 
           # Start ARQ worker container
@@ -286,7 +287,7 @@ jobs:
             --health-timeout=10s \
             --health-start-period=10s \
             --health-retries=3 \
-            ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
             arq app.services.arq_worker.WorkerSettings
 
           # Verify containers are running
@@ -321,7 +322,7 @@ jobs:
           fi
 
           yc container image list \
-            --registry-id ${{ secrets.YC_REGISTRY_ID }} \
+            --registry-id ${{ env.REGISTRY_ID }} \
             --format json 2>/dev/null | \
           jq -r '.[] | select(.tags | length == 0 or (.[0] | contains("latest") | not)) | .id' | \
           tail -n +6 | \
