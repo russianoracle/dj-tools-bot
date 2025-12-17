@@ -202,15 +202,6 @@ GitHub Actions automatically:
 - Redis caching for repeated analysis
 - Apple Silicon (M2) optimizations
 
----
-
-## Documentation
-
-- [ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md) - System architecture overview
-- [REFACTORING_PLAN.md](docs/REFACTORING_PLAN.md) - Refactoring roadmap
-- [ARQ_PATTERNS_REVIEW.md](ARQ_PATTERNS_REVIEW.md) - Workflow orchestration analysis
-- [DEPENDENCY_AUDIT.md](DEPENDENCY_AUDIT.md) - Dependency optimization report
-- [CLAUDE.md](CLAUDE.md) - AI assistant development guidelines
 
 ---
 
