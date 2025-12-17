@@ -230,71 +230,18 @@ jobs:
     needs: push-production
     if: success() && vars.YC_LOCKBOX_SECRET_ID != ''
     steps:
+      - uses: actions/checkout@v4
+
       - name: Fetch secrets from Lockbox
         run: |
-          echo "=== Fetching secrets from Yandex Lockbox ==="
-
-          # Get IAM token from metadata service
-          export IAM_TOKEN=$(curl -sf -H 'Metadata-Flavor: Google' \
-            http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token \
-            | jq -r '.access_token')
-
-          if [ -z "$IAM_TOKEN" ]; then
-            echo "ERROR: Failed to get IAM token"
+          # Use fetch-secrets.sh script (has built-in defaults)
+          if [ -f "./scripts/fetch-secrets.sh" ]; then
+            chmod +x ./scripts/fetch-secrets.sh
+            ./scripts/fetch-secrets.sh --env-file /opt/mood-classifier/.env
+          else
+            echo "ERROR: scripts/fetch-secrets.sh not found"
             exit 1
           fi
-          echo "✅ IAM token obtained"
-
-          # Fetch secrets from Lockbox
-          SECRET_ID="${{ secrets.YC_LOCKBOX_SECRET_ID }}"
-          if [ -z "$SECRET_ID" ]; then
-            echo "⚠️  YC_LOCKBOX_SECRET_ID not configured, skipping Lockbox fetch"
-            echo "Using manual secret configuration instead"
-            exit 0
-          fi
-          SECRETS=$(/opt/yc/bin/yc lockbox payload get --id "$SECRET_ID" --format json)
-
-          SECRET_COUNT=$(echo "$SECRETS" | jq -r '.entries | length')
-          echo "✅ Found $SECRET_COUNT secrets in Lockbox"
-
-          # Write to .env file
-          ENV_FILE="/opt/mood-classifier/.env"
-          mkdir -p /opt/mood-classifier
-
-          echo "# Auto-generated from Yandex Lockbox" > "$ENV_FILE"
-          echo "# Secret: ${SECRET_ID:0:8}..." >> "$ENV_FILE"
-          echo "# Generated: $(date -Iseconds)" >> "$ENV_FILE"
-          echo "" >> "$ENV_FILE"
-
-          echo "$SECRETS" | jq -r '.entries[] | "\(.key)=\(.text_value)"' >> "$ENV_FILE"
-
-          # Add static infrastructure vars
-          cat >> "$ENV_FILE" << 'ENVEOF'
-
-          # Infrastructure
-          DATA_DIR=/data
-          DOWNLOADS_DIR=/data/downloads
-          REDIS_HOST=localhost
-          REDIS_PORT=6379
-          LOG_LEVEL=INFO
-          LOG_JSON_FORMAT=true
-          REQUIRE_SECRETS=true
-
-          # Yandex Cloud
-          YC_FOLDER_ID=${{ secrets.YC_FOLDER_ID }}
-          YC_LOCKBOX_SECRET_ID=${{ secrets.YC_LOCKBOX_SECRET_ID }}
-          ENVEOF
-
-          chmod 600 "$ENV_FILE"
-          echo "✅ Secrets written to $ENV_FILE"
-
-          # Validate required secrets
-          source "$ENV_FILE"
-          if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
-            echo "❌ ERROR: TELEGRAM_BOT_TOKEN not found in Lockbox"
-            exit 1
-          fi
-          echo "✅ TELEGRAM_BOT_TOKEN validated"
 
       - name: Deploy containers
         run: |
