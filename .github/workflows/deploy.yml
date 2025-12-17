@@ -249,6 +249,13 @@ jobs:
             exit 1
           fi
 
+      - name: Login to YC registry
+        run: |
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login \
+            ${{ env.REGISTRY }} \
+            --username json_key \
+            --password-stdin
+
       - name: Deploy containers
         run: |
           echo "=== Deploying containers ==="
