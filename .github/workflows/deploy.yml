@@ -322,8 +322,8 @@ jobs:
         run: |
           echo "🧹 Cleaning up trash files on VM..."
 
-          # Remove old Docker logs (>7 days)
-          find /var/lib/docker/containers -name "*.log" -mtime +7 -delete 2>/dev/null || true
+          # Remove old Docker logs (>2 days)
+          find /var/lib/docker/containers -name "*.log" -mtime +2 -delete 2>/dev/null || true
 
           # Clean Docker system (unused images, containers, networks)
           docker system prune -f --volumes || true
