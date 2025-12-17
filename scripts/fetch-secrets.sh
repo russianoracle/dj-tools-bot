@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --secret-id ID       Lockbox secret ID (default: e6qrhl953e11s6flf61n)"
             echo "  --sa-id ID           Service account ID (default: aje6e9iq034u4cvf3cpp)"
             echo "  --sa-key FILE        Service account key JSON file"
-            echo "  --env-file PATH      Output .env file path (default: /opt/mood-classifier/.env)"
+            echo "  --env-file PATH      Output .env file path (default: /home/ubuntu/app/.env)"
             echo "  --yc-profile         Use yc CLI profile authentication"
             exit 1
             ;;
