@@ -6,6 +6,7 @@ that gets edited for all interactions. User messages are deleted.
 """
 
 import time
+import logging
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
@@ -14,6 +15,7 @@ from aiogram.fsm.context import FSMContext
 from ..keyboards.inline import get_main_keyboard, get_back_keyboard
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 # In-memory banned users (use Redis in production)
 banned_users: set = set()
@@ -65,8 +67,8 @@ async def ensure_main_message(
     if force_new and old_msg_id:
         try:
             await bot.delete_message(chat_id, old_msg_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to delete old message {old_msg_id}: {e}")
         old_msg_id = None
 
     if old_msg_id:
@@ -107,16 +109,16 @@ async def update_main_message(
         )
         # Update stored message ID
         user_main_message[user_id] = callback.message.message_id
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to edit callback message for user {user_id}: {e}")
 
 
 async def delete_user_message(message: Message) -> None:
     """Delete user's text message to keep chat clean."""
     try:
         await message.delete()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to delete user message {message.message_id}: {e}")
 
 
 @router.message(CommandStart())

@@ -15,7 +15,6 @@ from collections import Counter
 
 from .base import AudioContext, TaskResult, BaseTask
 from app.common.primitives import compute_key
-from app.common.primitives.harmonic import compute_chroma
 
 
 # Camelot Wheel mapping
@@ -125,27 +124,30 @@ class KeyAnalysisTask(BaseTask):
         Returns:
             KeyAnalysisResult with key metrics
         """
-        y = context.y
         sr = context.sr
+        stft_cache = context.stft_cache
 
-        # Calculate window parameters
-        window_samples = int(self.window_duration_sec * sr)
-        hop_samples = int(self.hop_duration_sec * sr)
+        # Get chromagram from cache (follows STFTCache architecture)
+        chroma_full = stft_cache.get_chroma()
 
-        # Extract key for each window using primitives
-        keys = []
+        # Calculate window parameters in frames
+        # chroma has hop_length=512 by default in STFTCache
         hop_length = 512
+        frames_per_sec = sr / hop_length
+        window_frames = int(self.window_duration_sec * frames_per_sec)
+        hop_frames = int(self.hop_duration_sec * frames_per_sec)
 
-        for start in range(0, len(y) - window_samples, hop_samples):
-            end = start + window_samples
-            y_window = y[start:end]
+        # Extract key for each window from full chromagram
+        keys = []
+        n_frames = chroma_full.shape[1]
+
+        for start_frame in range(0, n_frames - window_frames, hop_frames):
+            end_frame = start_frame + window_frames
+            chroma_window = chroma_full[:, start_frame:end_frame]
 
             try:
-                # Compute chromagram using primitive (wraps librosa internally)
-                chroma = compute_chroma(y_window, sr=sr, hop_length=hop_length)
-
                 # Estimate key
-                key, confidence = compute_key(chroma)
+                key, confidence = compute_key(chroma_window)
 
                 # Filter low-confidence detections
                 if confidence > 0.3:

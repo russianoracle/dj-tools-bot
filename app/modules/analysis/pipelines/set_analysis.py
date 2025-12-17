@@ -733,6 +733,10 @@ class SetAnalysisPipeline(Pipeline):
                 success=False,
                 error=str(e)
             )
+        finally:
+            # Cleanup STFTCache to prevent memory leak on long audio files
+            if context.audio_context and hasattr(context.audio_context, 'stft_cache'):
+                context.audio_context.stft_cache.clear_feature_cache()
 
 
 class SetBatchAnalyzer:

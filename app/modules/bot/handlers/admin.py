@@ -211,11 +211,13 @@ async def cb_admin_restart(callback: CallbackQuery):
 
     logger.info(f"Restart requested by admin {callback.from_user.id}")
 
-    # Schedule restart
+    # Schedule graceful shutdown (Docker restart policy will restart container)
     import asyncio
 
-    async def restart():
+    async def graceful_shutdown():
         await asyncio.sleep(1)
-        os.execv(sys.executable, ['python'] + sys.argv)
+        # Exit with code 1 to trigger Docker restart policy
+        # Safer than os.execv which can be exploited
+        sys.exit(1)
 
-    asyncio.create_task(restart())
+    asyncio.create_task(graceful_shutdown())

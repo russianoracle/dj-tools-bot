@@ -123,7 +123,7 @@ async def process_url(message: Message, state: FSMContext, bot: Bot):
     # Delete user's message
     await delete_user_message(message)
 
-    # Validate URL
+    # Validate URL format and domain (SSRF protection)
     if not url.startswith(("http://", "https://")):
         await ensure_main_message(
             bot=bot,
@@ -132,6 +132,55 @@ async def process_url(message: Message, state: FSMContext, bot: Bot):
             text=(
                 "⚠️ <b>Invalid URL</b>\n\n"
                 "Please send a valid link starting with http:// or https://\n\n"
+                "<i>Try again or press Cancel</i>"
+            ),
+            reply_markup=get_cancel_keyboard()
+        )
+        return
+
+    # Domain allowlist (prevent SSRF to internal networks)
+    from urllib.parse import urlparse
+    allowed_domains = [
+        'soundcloud.com',
+        'mixcloud.com',
+        'youtube.com',
+        'youtu.be',
+        'm.youtube.com',
+    ]
+
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower()
+
+        # Remove www. prefix if present
+        if domain.startswith('www.'):
+            domain = domain[4:]
+
+        # Check if domain matches allowed list
+        if not any(domain == d or domain.endswith('.' + d) for d in allowed_domains):
+            await ensure_main_message(
+                bot=bot,
+                user_id=user_id,
+                chat_id=chat_id,
+                text=(
+                    "⚠️ <b>Unsupported Platform</b>\n\n"
+                    "Supported platforms:\n"
+                    "• SoundCloud (soundcloud.com)\n"
+                    "• Mixcloud (mixcloud.com)\n"
+                    "• YouTube (youtube.com, youtu.be)\n\n"
+                    "<i>Try again or press Cancel</i>"
+                ),
+                reply_markup=get_cancel_keyboard()
+            )
+            return
+    except Exception:
+        await ensure_main_message(
+            bot=bot,
+            user_id=user_id,
+            chat_id=chat_id,
+            text=(
+                "⚠️ <b>Invalid URL</b>\n\n"
+                "Could not parse the URL. Please check and try again.\n\n"
                 "<i>Try again or press Cancel</i>"
             ),
             reply_markup=get_cancel_keyboard()

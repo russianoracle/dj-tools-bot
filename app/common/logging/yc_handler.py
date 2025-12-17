@@ -118,7 +118,8 @@ class YandexCloudLoggingHandler(logging.Handler):
             )
             return True
         except Exception as e:
-            print(f"Failed to init YC SDK: {e}")
+            import sys
+            sys.stderr.write(f"YCLoggingHandler: Failed to init YC SDK: {e}\n")
             return False
 
     def _start_worker(self):
@@ -157,7 +158,8 @@ class YandexCloudLoggingHandler(logging.Handler):
                     last_flush = now
 
             except Exception as e:
-                print(f"YC Logging worker error: {e}")
+                import sys
+                sys.stderr.write(f"YCLoggingHandler: Worker error: {e}\n")
 
         # Final flush on shutdown
         if batch:
@@ -207,7 +209,8 @@ class YandexCloudLoggingHandler(logging.Handler):
             self._channel.Write(request)
 
         except Exception as e:
-            print(f"Failed to send logs to YC: {e}")
+            import sys
+            sys.stderr.write(f"YCLoggingHandler: Failed to send logs: {e}\n")
 
     def emit(self, record: logging.LogRecord):
         """Queue log record for async sending."""

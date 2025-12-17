@@ -168,19 +168,18 @@ def _mel_filterbank(sr: int, n_fft: int, n_mels: int = 128,
     fft_freqs = np.fft.rfftfreq(n_fft, 1.0 / sr).astype(np.float32)
 
     # Build filterbank with vectorized operations
-    weights = np.zeros((n_mels, n_freq), dtype=np.float32)
+    # Vectorized mel filterbank computation (no loops)
+    f_left = freqs[:-2, np.newaxis]     # (n_mels, 1)
+    f_center = freqs[1:-1, np.newaxis]  # (n_mels, 1)
+    f_right = freqs[2:, np.newaxis]     # (n_mels, 1)
+    fft_freqs_broadcast = fft_freqs[np.newaxis, :]  # (1, n_freq)
 
-    for i in range(n_mels):
-        f_left = freqs[i]
-        f_center = freqs[i + 1]
-        f_right = freqs[i + 2]
+    # Lower slope: (fft_freqs - f_left) / (f_center - f_left)
+    lower = (fft_freqs_broadcast - f_left) / (f_center - f_left + 1e-10)
+    # Upper slope: (f_right - fft_freqs) / (f_right - f_center)
+    upper = (f_right - fft_freqs_broadcast) / (f_right - f_center + 1e-10)
 
-        # Lower slope
-        lower = (fft_freqs - f_left) / (f_center - f_left + 1e-10)
-        # Upper slope
-        upper = (f_right - fft_freqs) / (f_right - f_center + 1e-10)
-
-        weights[i] = np.maximum(0, np.minimum(lower, upper))
+    weights = np.maximum(0, np.minimum(lower, upper)).astype(np.float32)
 
     # Normalize
     enorm = 2.0 / (freqs[2:] - freqs[:-2] + 1e-10)
