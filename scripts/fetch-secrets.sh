@@ -21,7 +21,7 @@ set -e
 # Configuration
 SECRET_ID="${YC_LOCKBOX_SECRET_ID:-e6qrhl953e11s6flf61n}"
 SERVICE_ACCOUNT_ID="${YC_SERVICE_ACCOUNT_ID:-aje6e9iq034u4cvf3cpp}"
-ENV_FILE="${ENV_FILE:-/opt/mood-classifier/.env}"
+ENV_FILE="${ENV_FILE:-/home/ubuntu/app/.env}"
 YC_BIN="${YC_BIN:-yc}"
 SA_KEY_FILE=""
 AUTH_METHOD="metadata"
