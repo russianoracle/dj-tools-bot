@@ -228,7 +228,7 @@ jobs:
     name: Deploy to VM
     runs-on: self-hosted
     needs: push-production
-    if: success() && vars.YC_LOCKBOX_SECRET_ID != ''
+    # No conditional - fetch-secrets.sh has built-in defaults
     steps:
       - uses: actions/checkout@v4
 
