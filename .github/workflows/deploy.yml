@@ -228,7 +228,7 @@ jobs:
     name: Deploy to VM
     runs-on: self-hosted
     needs: push-production
-    if: success()
+    if: success() && vars.YC_LOCKBOX_SECRET_ID != ''
     steps:
       - name: Fetch secrets from Lockbox
         run: |
@@ -247,6 +247,11 @@ jobs:
 
           # Fetch secrets from Lockbox
           SECRET_ID="${{ secrets.YC_LOCKBOX_SECRET_ID }}"
+          if [ -z "$SECRET_ID" ]; then
+            echo "⚠️  YC_LOCKBOX_SECRET_ID not configured, skipping Lockbox fetch"
+            echo "Using manual secret configuration instead"
+            exit 0
+          fi
           SECRETS=$(/opt/yc/bin/yc lockbox payload get --id "$SECRET_ID" --format json)
 
           SECRET_COUNT=$(echo "$SECRETS" | jq -r '.entries | length')
