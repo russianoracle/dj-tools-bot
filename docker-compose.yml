@@ -1,5 +1,17 @@
 version: "3.9"
 
+# =============================================================================
+# Yandex Lockbox Integration
+# =============================================================================
+# Before starting, run: ./scripts/fetch-secrets.sh
+# This creates .env file from Lockbox secrets
+#
+# Required secrets in Lockbox (YC_LOCKBOX_SECRET_ID):
+#   - TELEGRAM_BOT_TOKEN (required)
+#   - ADMIN_USER_ID (optional)
+#   - YC_LOG_GROUP_ID (optional, for cloud logging)
+# =============================================================================
+
 services:
   bot:
     image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/mood-classifier:${TAG:-latest}
@@ -8,11 +20,21 @@ services:
     env_file:
       - .env
     environment:
+      # Infrastructure (override .env if needed)
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DATA_DIR=/data
       - DOWNLOADS_DIR=/data/downloads
       - MAX_FILE_SIZE_MB=500
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_JSON_FORMAT=${LOG_JSON_FORMAT:-true}
+      # Secrets validation
+      - REQUIRE_SECRETS=${REQUIRE_SECRETS:-true}
+      # Lockbox runtime loading (fallback if .env incomplete)
+      - YC_LOCKBOX_SECRET_ID=${YC_LOCKBOX_SECRET_ID:-}
+      - YC_FOLDER_ID=${YC_FOLDER_ID:-}
+      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
     volumes:
       # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
       - mood_data:/data
@@ -43,10 +65,18 @@ services:
     env_file:
       - .env
     environment:
+      # Infrastructure
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DATA_DIR=/data
       - DOWNLOADS_DIR=/data/downloads
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_JSON_FORMAT=${LOG_JSON_FORMAT:-true}
+      # Lockbox (for consistency with bot)
+      - YC_LOCKBOX_SECRET_ID=${YC_LOCKBOX_SECRET_ID:-}
+      - YC_FOLDER_ID=${YC_FOLDER_ID:-}
+      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
     volumes:
       # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
       - mood_data:/data

@@ -6,22 +6,37 @@ Clean Architecture application for DJ set analysis.
 """
 
 import asyncio
-import logging
+import os
 import sys
 from pathlib import Path
 
 # Add app to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Load .env file
+# Load .env file (for local development)
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+# Load secrets from Yandex Lockbox (production)
+from app.core.secrets import init_secrets
+init_secrets(
+    secret_id=os.getenv("YC_LOCKBOX_SECRET_ID"),
+    validate=True,
+    fail_on_missing=os.getenv("REQUIRE_SECRETS", "true").lower() == "true",
 )
-logger = logging.getLogger(__name__)
+
+# Setup centralized logging with YC Cloud Logging support
+from app.common.logging import setup_logging, get_logger
+
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_file=os.getenv("LOG_FILE"),
+    json_format=os.getenv("LOG_JSON_FORMAT", "true").lower() == "true",
+    enable_yc_logging=True,
+    yc_resource_type="bot",
+)
+
+logger = get_logger(__name__)
 
 
 async def main():

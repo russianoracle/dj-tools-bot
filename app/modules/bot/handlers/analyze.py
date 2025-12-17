@@ -6,7 +6,6 @@ Uses ARQ for async task queue (compatible with Redis 8.x/Valkey).
 """
 
 import os
-import logging
 from datetime import datetime
 
 from aiogram import Router, F, Bot
@@ -30,9 +29,11 @@ from .start import (
     get_main_text,
     get_main_keyboard,
 )
+from app.common.logging import get_logger
+from app.common.logging.correlation import set_job_id
 
 router = Router()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # In-memory job storage (use Redis in production)
 user_jobs: dict = {}  # user_id -> [job_ids]
@@ -157,8 +158,10 @@ async def process_url(message: Message, state: FSMContext, bot: Bot):
     # Queue analysis via ARQ
     try:
         job_id = await enqueue_download_and_analyze(url, user_id)
+        set_job_id(job_id)
+        logger.info("URL analysis queued", data={"url": url[:100], "job_id": job_id})
     except Exception as e:
-        logger.error(f"Failed to queue task: {e}")
+        logger.error(f"Failed to queue task: {e}", data={"url": url[:100]})
         await ensure_main_message(
             bot=bot,
             user_id=user_id,
@@ -354,8 +357,14 @@ async def handle_file(message: Message, state: FSMContext, bot: Bot):
         # Queue analysis via ARQ
         try:
             job_id = await enqueue_analyze_set(local_path, user_id)
+            set_job_id(job_id)
+            logger.info("File analysis queued", data={
+                "file_name": file_name,
+                "file_size_mb": file.file_size // (1024*1024) if file.file_size else 0,
+                "job_id": job_id,
+            })
         except Exception as e:
-            logger.error(f"Failed to queue ARQ task: {e}")
+            logger.error(f"Failed to queue ARQ task: {e}", data={"file_name": file_name})
             job_id = f"job_{file_id}"  # Fallback ID
 
         # Store job
@@ -377,7 +386,7 @@ async def handle_file(message: Message, state: FSMContext, bot: Bot):
         )
 
     except Exception as e:
-        logger.error(f"Failed to process file: {e}")
+        logger.error(f"Failed to process file: {e}", exc_info=True, data={"file_name": file_name})
         await ensure_main_message(
             bot=bot,
             user_id=user_id,

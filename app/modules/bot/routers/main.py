@@ -5,20 +5,15 @@ Uses ARQ for async task queue (Redis 8.x/Valkey compatible).
 """
 
 import os
-import logging
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 
 from ..handlers import start, analyze, admin, profile, generate
+from app.common.logging import get_logger, CorrelationMiddleware
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Environment variables
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -38,6 +33,9 @@ def create_bot() -> Bot:
 def create_dispatcher() -> Dispatcher:
     """Create dispatcher with all routers."""
     dp = Dispatcher()
+
+    # Add correlation ID middleware for request tracing
+    dp.update.middleware(CorrelationMiddleware())
 
     # Create main router
     main_router = Router()

@@ -41,6 +41,9 @@ numba>=0.57.0  # JIT compilation for librosa
 aiogram>=3.0.0
 python-dotenv>=1.0.0
 
+# Yandex Cloud Logging
+yandexcloud>=0.300.0
+
 # Task Queue (Redis 8.x/Valkey compatible)
 arq>=0.25.0
 redis>=5.0.0

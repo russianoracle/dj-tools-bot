@@ -1,7 +1,18 @@
 """Utility modules for mood classifier."""
 
 from .config import Config, get_config
-from .logger import setup_logger, get_logger
+from .logger import setup_logger, setup_logging, get_logger
+from .formatters import JSONFormatter, StructuredLogAdapter
+from .correlation import (
+    CorrelationMiddleware,
+    CorrelationLogFilter,
+    get_correlation_id,
+    set_correlation_id,
+    get_user_id,
+    set_user_id,
+    get_job_id,
+    set_job_id,
+)
 from .format import (
     format_time,
     format_time_range,
@@ -29,7 +40,20 @@ __all__ = [
     'get_config',
     # Logger
     'setup_logger',
+    'setup_logging',
     'get_logger',
+    # Structured logging
+    'JSONFormatter',
+    'StructuredLogAdapter',
+    # Correlation
+    'CorrelationMiddleware',
+    'CorrelationLogFilter',
+    'get_correlation_id',
+    'set_correlation_id',
+    'get_user_id',
+    'set_user_id',
+    'get_job_id',
+    'set_job_id',
     # Format
     'format_time',
     'format_time_range',
