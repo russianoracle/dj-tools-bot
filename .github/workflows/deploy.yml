@@ -60,8 +60,8 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: self-hosted
-    needs: [setup-builder, security]
-    if: always()
+    needs: setup-builder
+    # Run immediately after setup-builder, don't wait for security
     steps:
       - uses: actions/checkout@v4
 
