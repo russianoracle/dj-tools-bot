@@ -1,10 +1,29 @@
-"""Yandex Cloud Lockbox secrets loader."""
+"""Yandex Cloud Lockbox secrets loader.
+
+Usage:
+    # At application startup
+    from app.core.secrets import init_secrets
+    init_secrets()  # Uses YC_LOCKBOX_SECRET_ID env var
+
+    # Or manually
+    from app.core.secrets import load_secrets_to_env
+    load_secrets_to_env("e6qrhl953e11s6flf61n")
+
+Environment Variables:
+    YC_LOCKBOX_SECRET_ID: Lockbox secret ID (default: e6qrhl953e11s6flf61n)
+    YC_SERVICE_ACCOUNT_ID: Service account ID (default: aje6e9iq034u4cvf3cpp)
+    YC_SA_KEY_FILE: Path to service account key JSON file (optional, for local dev)
+"""
 
 import os
 import logging
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# Default Yandex Cloud configuration
+DEFAULT_SECRET_ID = "e6qrhl953e11s6flf61n"
+DEFAULT_SERVICE_ACCOUNT_ID = "aje6e9iq034u4cvf3cpp"
 
 # Lazy imports for yandexcloud SDK
 _lockbox_client = None
@@ -158,7 +177,7 @@ def init_secrets(
     Initialize secrets from Lockbox and validate.
 
     Args:
-        secret_id: Lockbox secret ID (or YC_LOCKBOX_SECRET_ID env var)
+        secret_id: Lockbox secret ID (uses env YC_LOCKBOX_SECRET_ID or default)
         validate: Whether to validate required secrets
         fail_on_missing: Raise exception if required secrets missing
 
@@ -168,7 +187,7 @@ def init_secrets(
     Raises:
         RuntimeError: If fail_on_missing=True and secrets are missing
     """
-    sid = secret_id or os.getenv("YC_LOCKBOX_SECRET_ID")
+    sid = secret_id or os.getenv("YC_LOCKBOX_SECRET_ID") or DEFAULT_SECRET_ID
 
     if sid:
         loaded = load_secrets_to_env(sid)
