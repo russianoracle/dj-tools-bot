@@ -310,12 +310,36 @@ jobs:
           echo "✅ Deployment successful"
 
   # ===========================================================================
-  # Job 7: Cleanup Registry
+  # Job 7: Cleanup VM Trash Files
+  # ===========================================================================
+  cleanup-vm:
+    name: Cleanup VM Trash Files
+    runs-on: self-hosted
+    needs: deploy
+    if: success()
+    steps:
+      - name: Cleanup trash files on VM
+        run: |
+          echo "🧹 Cleaning up trash files on VM..."
+
+          # Remove old Docker logs (>7 days)
+          find /var/lib/docker/containers -name "*.log" -mtime +7 -delete 2>/dev/null || true
+
+          # Clean Docker system (unused images, containers, networks)
+          docker system prune -f --volumes || true
+
+          # Clean package cache
+          sudo apt-get clean 2>/dev/null || true
+
+          echo "✅ VM cleanup complete"
+
+  # ===========================================================================
+  # Job 8: Cleanup Registry
   # ===========================================================================
   cleanup-registry:
     name: Cleanup Registry
     runs-on: self-hosted
-    needs: [cleanup, deploy]
+    needs: [cleanup, cleanup-vm]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Cleanup old images in registry (keep last 5)
