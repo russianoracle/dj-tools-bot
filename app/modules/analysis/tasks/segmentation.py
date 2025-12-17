@@ -190,9 +190,8 @@ class SegmentationTask(BaseTask):
 
             # 1. Beat tracking via STFTCache (librosa centralized)
             tempo = context.stft_cache.get_tempo()
-            beat_frames = context.stft_cache.get_beats()
+            beat_frames, beat_times = context.stft_cache.get_beats()
             hop_length = context.stft_cache.hop_length
-            beat_times = beat_frames.astype(np.float32) * hop_length / sr
 
             if len(beat_frames) < 4:
                 return self._single_segment_result(

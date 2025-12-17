@@ -12,11 +12,56 @@ import numpy as np
 import pytest
 from pathlib import Path
 from typing import Tuple
+from types import ModuleType
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+# =============================================================================
+# Module Aliasing: src -> app
+# Tests use 'src.core.primitives' but actual path is 'app.common.primitives'
+# =============================================================================
+import app
+import app.common
+import app.common.primitives
+import app.core
+import app.core.cache
+import app.core.adapters
+import app.core.adapters.feature_factory
+import app.modules.analysis.tasks
+
+# Create src module tree
+src = ModuleType('src')
+src.core = ModuleType('src.core')
+src.core.primitives = app.common.primitives
+src.core.cache = app.core.cache
+src.core.tasks = app.modules.analysis.tasks
+src.core.feature_factory = app.core.adapters.feature_factory
+
+# Register in sys.modules
+sys.modules['src'] = src
+sys.modules['src.core'] = src.core
+sys.modules['src.core.primitives'] = app.common.primitives
+sys.modules['src.core.primitives.stft'] = app.common.primitives.stft
+sys.modules['src.core.primitives.energy'] = app.common.primitives.energy
+sys.modules['src.core.primitives.spectral'] = app.common.primitives.spectral
+sys.modules['src.core.primitives.rhythm'] = app.common.primitives.rhythm
+sys.modules['src.core.primitives.dynamics'] = app.common.primitives.dynamics
+sys.modules['src.core.primitives.harmonic'] = app.common.primitives.harmonic
+sys.modules['src.core.primitives.filtering'] = app.common.primitives.filtering
+sys.modules['src.core.primitives.beat_grid'] = app.common.primitives.beat_grid
+sys.modules['src.core.primitives.transition_scoring'] = app.common.primitives.transition_scoring
+sys.modules['src.core.primitives.segmentation'] = app.common.primitives.segmentation
+sys.modules['src.core.cache'] = app.core.cache
+sys.modules['src.core.feature_factory'] = app.core.adapters.feature_factory
+sys.modules['src.core.tasks'] = app.modules.analysis.tasks
+sys.modules['src.core.tasks.base'] = app.modules.analysis.tasks.base
+sys.modules['src.core.tasks.feature_extraction'] = app.modules.analysis.tasks.feature_extraction
+sys.modules['src.core.tasks.drop_detection'] = app.modules.analysis.tasks.drop_detection
+sys.modules['src.core.tasks.transition_detection'] = app.modules.analysis.tasks.transition_detection
+sys.modules['src.core.tasks.segmentation'] = app.modules.analysis.tasks.segmentation
 
 
 # =============================================================================

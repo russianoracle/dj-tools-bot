@@ -14,6 +14,18 @@ import os
 import shutil
 
 
+def is_inside_container():
+    """Check if running inside a Docker container."""
+    return os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER') == '1'
+
+
+# Skip entire module if not in container
+pytestmark = pytest.mark.skipif(
+    not is_inside_container(),
+    reason="CI container tests require Docker environment"
+)
+
+
 @pytest.mark.integration
 @pytest.mark.container
 class TestContainerDependencies:
