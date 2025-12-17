@@ -212,10 +212,11 @@ source "$ENV_FILE"
 set +a
 
 for secret in $REQUIRED_SECRETS; do
-    if [ -z "${!secret}" ]; then
+    value="${!secret}"
+    if [ -z "$value" ]; then
         MISSING_REQUIRED="$MISSING_REQUIRED $secret"
     else
-        echo "  ✅ $secret: set (${#!secret} chars)"
+        echo "  ✅ $secret: set (${#value} chars)"
     fi
 done
 
