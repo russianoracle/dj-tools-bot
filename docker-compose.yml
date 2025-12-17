@@ -118,6 +118,25 @@ services:
       retries: 5
       start_period: 5s
 
+  fluent-bit:
+    image: cr.yandex/yc/fluent-bit-plugin-yandex:v1.0.5-fluent-bit-1.9.3
+    container_name: mood-fluent-bit
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
+    volumes:
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app-network
+    depends_on:
+      - bot
+      - worker
+
 volumes:
   # КРИТИЧНО: Персистентные данные (выживают при обновлении контейнеров)
   mood_data:
