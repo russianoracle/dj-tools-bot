@@ -12,6 +12,7 @@ env:
   IMAGE_NAME: mood-classifier
   PYTHON_VERSION: "3.12"
   SHARED_BUILDER: ci-shared-builder
+  GH_BIN: /opt/homebrew/bin/gh
 
 jobs:
   # ===========================================================================
