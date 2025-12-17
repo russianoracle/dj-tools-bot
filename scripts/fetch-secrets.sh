@@ -170,7 +170,7 @@ echo "# Secret: ${SECRET_ID:0:8}..." >> "$ENV_FILE"
 echo "# Generated: $(date -Iseconds)" >> "$ENV_FILE"
 echo "" >> "$ENV_FILE"
 
-echo "$SECRETS" | jq -r '.entries[] | "\(.key)=\(.text_value)"' >> "$ENV_FILE"
+echo "$SECRETS" | jq -r '.entries[] | "\(.key | ascii_upcase)=\(.text_value)"' >> "$ENV_FILE"
 
 # Add static infrastructure env vars
 cat >> "$ENV_FILE" << 'EOF'
@@ -202,6 +202,7 @@ echo "[4/4] Validating secrets..."
 
 REQUIRED_SECRETS="TELEGRAM_BOT_TOKEN"
 OPTIONAL_SECRETS="ADMIN_USER_ID YC_LOG_GROUP_ID YTDLP_PROXY"
+# Note: Lockbox keys are lowercase, converted to UPPERCASE for env vars
 MISSING_REQUIRED=""
 MISSING_OPTIONAL=""
 
