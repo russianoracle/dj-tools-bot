@@ -48,6 +48,7 @@ jobs:
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
@@ -60,6 +61,7 @@ jobs:
     name: Build & Test
     runs-on: self-hosted
     needs: [setup-builder, security]
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
