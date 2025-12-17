@@ -116,7 +116,7 @@ jobs:
             -e DATA_DIR=/data \
             -e DOWNLOADS_DIR=/tmp/downloads \
             mood-classifier:test-${{ github.sha }} \
-            pytest tests/test_ci_container.py -v --tb=short || true
+            pytest tests/test_ci_container.py -v --tb=short
 
       - name: Start Redis for integration tests
         run: |
@@ -131,7 +131,7 @@ jobs:
             --network host \
             -e REDIS_HOST=localhost \
             mood-classifier:test-${{ github.sha }} \
-            pytest tests/test_ci_cache_redis.py -v --tb=short || true
+            pytest tests/test_ci_cache_redis.py -v --tb=short
 
       - name: Run pipeline tests (real audio)
         run: |
@@ -139,7 +139,7 @@ jobs:
             -v $(pwd)/tests:/app/tests \
             -v $(pwd)/tests/fixtures:/app/tests/fixtures \
             mood-classifier:test-${{ github.sha }} \
-            pytest tests/test_ci_pipelines.py -v --tb=short || true
+            pytest tests/test_ci_pipelines.py -v --tb=short
 
       - name: Cleanup Redis
         if: always()
