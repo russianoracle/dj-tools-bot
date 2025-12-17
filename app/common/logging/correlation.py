@@ -1,6 +1,7 @@
 """Correlation ID middleware for request tracing."""
 
 import uuid
+import logging
 import contextvars
 from typing import Callable, Awaitable, Any
 
@@ -114,7 +115,3 @@ class CorrelationLogFilter(logging.Filter):
         record.user_id = get_user_id()
         record.job_id = get_job_id()
         return True
-
-
-# Need to import logging for the filter
-import logging
