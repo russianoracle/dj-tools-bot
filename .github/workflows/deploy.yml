@@ -199,7 +199,7 @@ jobs:
   cleanup:
     name: Cleanup Local Cache
     runs-on: self-hosted
-    needs: [push-production]
+    needs: deploy
     if: always()
     steps:
       - name: Clean old local test images
@@ -289,20 +289,74 @@ jobs:
           echo "✅ Deployment successful"
 
   # ===========================================================================
-  # Job 7: Cleanup VM Trash Files
+  # Job 7: Cleanup Old Docker Images (parallel after deploy)
   # ===========================================================================
-  cleanup-vm:
-    name: Cleanup VM Trash Files
+  cleanup-docker-images:
+    name: Cleanup Old Docker Images
     runs-on: self-hosted
     needs: deploy
     if: always()
     steps:
-      - name: Cleanup trash files on VM
+      - name: Clean old local test images
         run: |
-          echo "🧹 Cleaning up trash files on VM..."
+          echo "🧹 Cleaning old Docker images (keeping last 2)..."
+
+          docker images --format "{{.Repository}}:{{.Tag}}" | \
+            grep "mood-classifier:test-" | \
+            tail -n +3 | \
+            xargs -r docker rmi -f || true
+
+          docker image prune -f
+
+          echo "✅ Docker image cleanup complete"
+
+  # ===========================================================================
+  # Job 8: Cleanup Old Logs (parallel after deploy)
+  # ===========================================================================
+  cleanup-logs:
+    name: Cleanup Old Logs
+    runs-on: self-hosted
+    needs: deploy
+    if: always()
+    steps:
+      - name: Remove old Docker logs
+        run: |
+          echo "🧹 Cleaning up old logs (>2 days)..."
 
           # Remove old Docker logs (>2 days)
           find /var/lib/docker/containers -name "*.log" -mtime +2 -delete 2>/dev/null || true
+
+          # Check cache size
+          if [ -d /tmp/.buildx-cache ]; then
+            cache_size=$(du -sh /tmp/.buildx-cache | cut -f1)
+            echo "BuildKit cache size: $cache_size"
+
+            size_bytes=$(du -sb /tmp/.buildx-cache | cut -f1)
+            if [ $size_bytes -gt 16000000000 ]; then
+              echo "⚠️ Cache is very large (>15GB), consider clearing"
+            fi
+          fi
+
+          echo "✅ Log cleanup complete"
+
+  # ===========================================================================
+  # Job 9: Cleanup Downloads Directory (parallel after deploy)
+  # ===========================================================================
+  cleanup-downloads:
+    name: Cleanup Downloads Directory
+    runs-on: self-hosted
+    needs: deploy
+    if: always()
+    steps:
+      - name: Clean downloads and system cache
+        run: |
+          echo "🧹 Cleaning downloads directory and system cache..."
+
+          # Clean downloads if it exists
+          if [ -d /tmp/downloads ]; then
+            rm -rf /tmp/downloads/* 2>/dev/null || true
+            echo "Cleaned /tmp/downloads"
+          fi
 
           # Clean Docker system (unused images, containers, networks)
           docker system prune -f --volumes || true
@@ -310,15 +364,15 @@ jobs:
           # Clean package cache
           sudo apt-get clean 2>/dev/null || true
 
-          echo "✅ VM cleanup complete"
+          echo "✅ Downloads and cache cleanup complete"
 
   # ===========================================================================
-  # Job 8: Cleanup Registry
+  # Job 10: Cleanup Registry (runs after all parallel cleanups complete)
   # ===========================================================================
   cleanup-registry:
     name: Cleanup Registry
     runs-on: self-hosted
-    needs: [cleanup, cleanup-vm]
+    needs: [cleanup, cleanup-docker-images, cleanup-logs, cleanup-downloads]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Cleanup old images in registry (keep last 5)
@@ -343,4 +397,4 @@ jobs:
             fi
           done
 
-          echo "Registry cleanup complete"
+          echo "✅ Registry cleanup complete"
