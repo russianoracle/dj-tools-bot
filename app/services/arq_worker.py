@@ -40,68 +40,128 @@ logger = get_logger(__name__)
 # ============================================================================
 
 
-def download_audio(url: str, output_template: str) -> str:
+def download_audio(url: str, output_template: str, max_retries: int = 3) -> str:
     """
-    Download audio using yt-dlp via NAT Gateway.
+    Download audio using yt-dlp via NAT Gateway with retry logic.
 
     Args:
         url: Audio URL (SoundCloud, YouTube, etc.)
         output_template: Output path template with %(ext)s
+        max_retries: Maximum number of retry attempts (default: 3)
 
     Returns:
         Path to downloaded file (without extension placeholder)
 
     Raises:
-        Exception if download fails
+        Exception if download fails after all retries
     """
-    logger.info(f"Download attempt via NAT Gateway")
+    last_error = None
 
-    cmd = [
-        "yt-dlp",
-        "-x",
-        "--audio-format", "mp3",
-        "--audio-quality", "0",
-        "-o", output_template,
-        "--max-filesize", "500M",
-        "--no-warnings",
-        "--socket-timeout", "60",
-        # Geo-bypass options
-        "--geo-bypass",
-        "--geo-bypass-country", "US",
-        # User-agent to avoid bot detection
-        "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        # Retry on network errors (yt-dlp internal retries)
-        "--retries", "3",
-        "--fragment-retries", "3",
-        url,
-    ]
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                backoff_time = min(2 ** attempt, 30)  # Exponential backoff, max 30s
+                logger.info(f"Retry attempt {attempt + 1}/{max_retries} after {backoff_time}s", data={
+                    "url": url[:100],
+                    "attempt": attempt + 1,
+                    "backoff_sec": backoff_time,
+                })
+                time.sleep(backoff_time)
+            else:
+                logger.info("Download attempt via NAT Gateway")
 
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 min timeout for large files
-        )
+            cmd = [
+                "yt-dlp",
+                "-x",
+                "--audio-format", "mp3",
+                "--audio-quality", "0",
+                "-o", output_template,
+                "--max-filesize", "500M",
+                "--no-warnings",
+                "--socket-timeout", "90",  # Increased from 60s
+                # Geo-bypass options
+                "--geo-bypass",
+                "--geo-bypass-country", "US",
+                # User-agent to avoid bot detection
+                "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                # Retry on network errors (yt-dlp internal retries)
+                "--retries", "5",  # Increased from 3
+                "--fragment-retries", "5",  # Increased from 3
+                # Add network error handling
+                "--abort-on-error",
+                url,
+            ]
 
-        if result.returncode == 0:
-            logger.info("Download successful via NAT Gateway")
-            return output_template.replace(".%(ext)s", "")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 min timeout for large files
+            )
 
-        # Download failed
-        stderr = result.stderr
-        stdout = result.stdout
-        error_msg = stderr[:300] if stderr else stdout[:300]
-        logger.warning(f"Download failed: {error_msg}")
-        raise Exception(f"yt-dlp failed: {error_msg}")
+            if result.returncode == 0:
+                logger.info("Download successful via NAT Gateway", data={
+                    "attempt": attempt + 1,
+                    "url": url[:100],
+                })
+                return output_template.replace(".%(ext)s", "")
 
-    except subprocess.TimeoutExpired:
-        logger.warning("Download timeout (300s)")
-        raise Exception("Download timeout after 300s")
+            # Download failed - prepare for retry
+            stderr = result.stderr
+            stdout = result.stdout
+            error_msg = stderr[:300] if stderr else stdout[:300]
 
-    except Exception as e:
-        logger.error(f"Download exception: {e}")
-        raise
+            # Check if error is retryable
+            retryable_errors = [
+                "Connection reset by peer",
+                "Connection aborted",
+                "Connection refused",
+                "Temporary failure",
+                "timed out",
+                "Unable to download webpage",
+            ]
+            is_retryable = any(err in error_msg for err in retryable_errors)
+
+            if is_retryable and attempt < max_retries - 1:
+                logger.warning(f"Download failed (retryable): {error_msg[:150]}", data={
+                    "attempt": attempt + 1,
+                    "will_retry": True,
+                })
+                last_error = Exception(f"yt-dlp failed: {error_msg}")
+                continue
+            else:
+                logger.warning(f"Download failed (non-retryable or final attempt): {error_msg}")
+                raise Exception(f"yt-dlp failed: {error_msg}")
+
+        except subprocess.TimeoutExpired:
+            error = "Download timeout after 300s"
+            if attempt < max_retries - 1:
+                logger.warning(f"{error} (will retry)", data={"attempt": attempt + 1})
+                last_error = Exception(error)
+                continue
+            else:
+                logger.warning(f"{error} (final attempt)")
+                raise Exception(error)
+
+        except Exception as e:
+            # Check if it's a retryable network error
+            error_str = str(e)
+            is_retryable = any(err in error_str for err in [
+                "Connection reset", "Connection aborted", "Connection refused"
+            ])
+
+            if is_retryable and attempt < max_retries - 1:
+                logger.warning(f"Download exception (will retry): {e}", data={"attempt": attempt + 1})
+                last_error = e
+                continue
+            else:
+                logger.error(f"Download exception: {e}", data={"attempt": attempt + 1})
+                raise
+
+    # All retries exhausted
+    if last_error:
+        raise last_error
+    raise Exception("Download failed after all retries")
 
 
 def download_with_failover(url: str, output_template: str) -> str:
