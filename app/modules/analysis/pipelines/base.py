@@ -154,10 +154,17 @@ class Pipeline:
         Returns:
             Final context with all results
         """
+        import psutil
+        from app.common.monitoring import get_metrics_collector
+
         context.results['_pipeline_name'] = self.name
         context.results['_start_time'] = time.time()
 
         logger.info(f"[{self.name}] Starting pipeline for {context.file_name}")
+
+        # Get metrics collector
+        metrics = get_metrics_collector()
+        process = psutil.Process()
 
         for i, stage in enumerate(self.stages):
             if stage.should_skip(context):
@@ -165,11 +172,41 @@ class Pipeline:
                 continue
 
             logger.info(f"[{self.name}] Stage {i+1}/{len(self.stages)}: {stage.name}")
+
+            # Track memory before stage
+            mem_before_mb = process.memory_info().rss / 1024 / 1024
+
             stage_start = time.time()
             context = stage.process(context)
             elapsed = time.time() - stage_start
+
+            # Track memory after stage
+            mem_after_mb = process.memory_info().rss / 1024 / 1024
+            mem_delta_mb = mem_after_mb - mem_before_mb
+
             context.results[f'_stage_{stage.name}_time'] = elapsed
-            logger.info(f"[{self.name}] {stage.name} done in {elapsed:.1f}s")
+            context.results[f'_stage_{stage.name}_memory_mb'] = mem_after_mb
+            context.results[f'_stage_{stage.name}_memory_delta_mb'] = mem_delta_mb
+
+            logger.info(f"[{self.name}] {stage.name} done in {elapsed:.1f}s", data={
+                "stage": stage.name,
+                "duration_sec": round(elapsed, 2),
+                "memory_before_mb": round(mem_before_mb, 1),
+                "memory_after_mb": round(mem_after_mb, 1),
+                "memory_delta_mb": round(mem_delta_mb, 1),
+            })
+
+            # Send stage metrics to YC Monitoring
+            stage_context = {
+                "file_duration_sec": context.results.get('_duration', 0),
+                "peak_memory_mb": mem_after_mb,
+            }
+            metrics.record_stage_metrics(
+                stage_name=stage.name,
+                duration_sec=elapsed,
+                memory_mb=mem_after_mb,
+                context=stage_context
+            )
 
             if self.on_stage_complete:
                 self.on_stage_complete(stage.name, context)
