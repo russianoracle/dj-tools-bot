@@ -15,8 +15,15 @@ from typing import Optional, Dict, Any
 from arq import create_pool
 from arq.connections import RedisSettings, ArqRedis
 
-from app.common.logging import get_logger
+from app.common.logging import get_logger, setup_logging
 from app.common.logging.correlation import set_job_id, set_user_id
+
+# Configure JSON logging for ARQ worker and framework
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    json_format=bool(os.getenv("LOG_JSON_FORMAT", "true").lower() in ("true", "1", "yes")),
+    enable_yc_logging=False,  # YC logging via fluent-bit
+)
 
 logger = get_logger(__name__)
 
