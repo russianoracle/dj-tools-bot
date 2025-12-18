@@ -263,48 +263,27 @@ jobs:
           # Pull new image (YC registry only, no Docker Hub fallback)
           docker pull ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
-          # Stop and remove old containers
-          docker stop mood-classifier mood-arq-worker 2>/dev/null || true
-          docker rm mood-classifier mood-arq-worker 2>/dev/null || true
+          # Copy updated docker-compose.yml and configs to VM
+          cd /home/ubuntu/app
 
-          # Start bot container with env file from Lockbox
-          docker run -d \
-            --name mood-classifier \
-            --restart unless-stopped \
-            --network host \
-            -v mood-data:/data \
-            --env-file /home/ubuntu/app/.env \
-            --health-cmd="python -c 'import sys; sys.exit(0)'" \
-            --health-interval=30s \
-            --health-timeout=10s \
-            --health-start-period=10s \
-            --health-retries=3 \
-            ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
-            python -m app.main
+          # Stop all services
+          docker-compose down || true
 
-          # Start ARQ worker container
-          docker run -d \
-            --name mood-arq-worker \
-            --restart unless-stopped \
-            --network host \
-            -v mood-data:/data \
-            --env-file /home/ubuntu/app/.env \
-            --health-cmd="python -c 'import sys; sys.exit(0)'" \
-            --health-interval=30s \
-            --health-timeout=10s \
-            --health-start-period=10s \
-            --health-retries=3 \
-            ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
-            arq app.services.arq_worker.WorkerSettings
+          # Start all services with docker-compose
+          docker-compose up -d
 
           # Verify containers are running
-          sleep 5
-          docker ps | grep -E "mood-classifier|mood-arq-worker"
+          sleep 10
+          docker-compose ps
 
           # Check logs for startup errors
           echo ""
           echo "=== Bot startup logs ==="
-          docker logs mood-classifier --tail 20
+          docker-compose logs --tail 20 bot
+
+          echo ""
+          echo "=== Fluent-bit logs ==="
+          docker-compose logs --tail 20 fluent-bit
 
           echo ""
           echo "✅ Deployment successful"
