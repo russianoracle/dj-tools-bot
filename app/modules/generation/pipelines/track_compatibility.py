@@ -14,13 +14,13 @@ Uses Tasks layer for all analysis, following the architecture:
 Primitives → Tasks → Pipelines
 """
 
-import logging
 import time
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
+from app.common.logging import get_logger
 from .base import (
     Pipeline, PipelineContext, PipelineStage,
     LoadAudioStage, ComputeSTFTStage,
@@ -45,7 +45,7 @@ from app.common.primitives import (
     apply_phase_correction,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # ============== Result Dataclass ==============

@@ -25,11 +25,11 @@ Usage:
     result = service.analyze_set("set.mp3", force=True)
 """
 
-import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Callable
 
+from app.common.logging import get_logger
 from ..core.pipelines import (
     SetAnalysisPipeline,
     SetAnalysisResult,

@@ -16,12 +16,12 @@ Supports two modes:
 - PLP: Local tempo per frame (for DJ sets with tempo variations)
 """
 
-import logging
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, List
 from enum import Enum, auto
 
+from app.common.logging import get_logger
 from .base import BaseTask, AudioContext
 from app.common.primitives import (
     compute_beat_grid,
@@ -39,7 +39,7 @@ class BeatGridMode(Enum):
     STATIC = auto()   # Single global tempo (single tracks)
     PLP = auto()      # Local tempo (DJ sets with tempo variations)
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

@@ -3,11 +3,11 @@
 from pathlib import Path
 from typing import Any, Optional
 from mutagen import File
-
 from enum import Enum
-import logging
 
-logger = logging.getLogger(__name__)
+from app.common.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class EnergyZone(str, Enum):

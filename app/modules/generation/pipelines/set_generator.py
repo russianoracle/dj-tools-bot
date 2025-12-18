@@ -12,7 +12,6 @@ Uses:
 - TransitionScore for optimization
 """
 
-import logging
 import time
 import json
 import random
@@ -22,6 +21,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from enum import Enum
 
+from app.common.logging import get_logger
 from app.core.connectors import CacheRepository
 from .track_compatibility import (
     TrackCompatibilityPipeline,
@@ -39,7 +39,7 @@ from app.common.primitives.transition_scoring import (
     score_bpm_compatibility,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # ============== Set Phase Definitions ==============

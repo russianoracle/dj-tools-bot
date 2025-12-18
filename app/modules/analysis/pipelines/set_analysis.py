@@ -19,6 +19,7 @@ from collections import Counter
 
 from app.common.logging import get_logger
 from app.common.logging.correlation import get_correlation_id, get_user_id, get_job_id
+from app.core.errors import TransitionDetectionError, SegmentationError, DropDetectionError
 
 logger = get_logger(__name__)
 
@@ -211,17 +212,26 @@ class DetectTransitionsStage(PipelineStage):
 
     def process(self, context: PipelineContext) -> PipelineContext:
         if context.audio_context is None:
-            logger.error("AudioContext required for transition detection", data={
-                "correlation_id": get_correlation_id(),
-                "job_id": get_job_id(),
-            })
-            raise ValueError("AudioContext required")
+            raise TransitionDetectionError(
+                "AudioContext required for transition detection",
+                data={
+                    "correlation_id": get_correlation_id(),
+                    "job_id": get_job_id(),
+                },
+            )
 
         logger.debug("Detecting transitions", data={
             "correlation_id": get_correlation_id(),
             "job_id": get_job_id(),
         })
-        result = self.task.execute(context.audio_context)
+        try:
+            result = self.task.execute(context.audio_context)
+        except Exception as e:
+            raise TransitionDetectionError(
+                "Transition detection failed",
+                data={"correlation_id": get_correlation_id(), "job_id": get_job_id()},
+                cause=e,
+            )
         logger.info("Transitions detected", data={
             "n_transitions": result.n_transitions if result else 0,
             "correlation_id": get_correlation_id(),
@@ -316,9 +326,12 @@ class DetectAllDropsStage(PipelineStage):
 
     def process(self, context: PipelineContext) -> PipelineContext:
         if context.audio_context is None:
-            raise ValueError("AudioContext required")
+            raise DropDetectionError("AudioContext required for drop detection")
 
-        result = self.task.execute(context.audio_context)
+        try:
+            result = self.task.execute(context.audio_context)
+        except Exception as e:
+            raise DropDetectionError("Drop detection failed", cause=e)
         context.set_result('drops', result)
         return context
 

@@ -4,7 +4,6 @@ Base classes for Pipelines layer.
 Pipeline = sequence of PipelineStages that transform PipelineContext.
 """
 
-import logging
 import numpy as np
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -12,11 +11,18 @@ from typing import Optional, Dict, Any, List, Callable
 from pathlib import Path
 import time
 
+from app.common.logging import get_logger
 from app.common.primitives import STFTCache, compute_stft
 from app.modules.analysis.tasks import AudioContext, create_audio_context
 from app.core.adapters.loader import AudioLoader
+from app.core.errors import (
+    AudioLoadError,
+    STFTError,
+    TaskExecutionError,
+    AnalysisError,
+)
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -265,7 +271,7 @@ class ComputeSTFTStage(PipelineStage):
         sr = context.results.get('_sr')
 
         if y is None or sr is None:
-            raise ValueError("Audio not loaded. Run LoadAudioStage first.")
+            raise STFTError("Audio not loaded. Run LoadAudioStage first.", data={"file": context.input_path})
 
         # Create AudioContext with STFT
         audio_ctx = create_audio_context(
@@ -306,10 +312,17 @@ class TaskStage(PipelineStage):
     def process(self, context: PipelineContext) -> PipelineContext:
         """Run the task."""
         if context.audio_context is None:
-            raise ValueError("AudioContext not created. Run ComputeSTFTStage first.")
+            raise TaskExecutionError("AudioContext not created. Run ComputeSTFTStage first.")
 
-        result = self.task.execute(context.audio_context)
-        context.set_result(self.result_key, result)
+        try:
+            result = self.task.execute(context.audio_context)
+            context.set_result(self.result_key, result)
+        except Exception as e:
+            raise TaskExecutionError(
+                f"Task {self.task.__class__.__name__} failed",
+                data={"task": self.task.__class__.__name__, "result_key": self.result_key},
+                cause=e,
+            )
 
         return context
 
@@ -393,8 +406,11 @@ class ParallelStage(PipelineStage):
                     name, result_context = future.result()
                     all_results.append(result_context.results)
                 except Exception as e:
-                    logger.error(f"Stage {stage.name} failed: {e}")
-                    raise
+                    raise AnalysisError(
+                        f"Pipeline stage '{stage.name}' failed",
+                        data={"stage": stage.name, "pipeline": self.__class__.__name__},
+                        cause=e,
+                    )
 
         # Batch merge all results (avoids repeated dict updates)
         for result_dict in all_results:

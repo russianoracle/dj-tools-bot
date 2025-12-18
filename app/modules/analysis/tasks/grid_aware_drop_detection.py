@@ -25,7 +25,6 @@ Usage:
     result = detector.execute(audio_context)
 """
 
-import logging
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
@@ -33,9 +32,10 @@ from pathlib import Path
 from enum import Enum, auto
 import pickle
 
+from app.common.logging import get_logger
 from .base import BaseTask, AudioContext
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DropType(Enum):

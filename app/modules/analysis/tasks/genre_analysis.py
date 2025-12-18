@@ -8,7 +8,6 @@ Fully self-contained - no external dependencies except Essentia.
 import os
 import json
 import time
-import logging
 import urllib.request
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -16,9 +15,10 @@ from typing import Dict, List, Optional, Any, Tuple
 
 import numpy as np
 
+from app.common.logging import get_logger
 from .base import AudioContext, TaskResult, BaseTask
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Suppress TF noise
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

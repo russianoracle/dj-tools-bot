@@ -14,8 +14,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 from enum import Enum, auto
-import logging
 
+from app.common.logging import get_logger
 from .base import BaseTask, AudioContext, TaskResult
 from app.common.primitives import (
     compute_novelty,
@@ -26,7 +26,7 @@ from app.common.primitives import (
 # These tasks process audio segments that aren't in the main STFTCache
 from app.common.primitives.harmonic import compute_mfcc, compute_chroma
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TransitionStyle(Enum):

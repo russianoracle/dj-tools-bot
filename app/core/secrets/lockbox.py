@@ -16,10 +16,11 @@ Environment Variables:
 """
 
 import os
-import logging
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from app.common.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Default Yandex Cloud configuration
 DEFAULT_SECRET_ID = "e6qrhl953e11s6flf61n"

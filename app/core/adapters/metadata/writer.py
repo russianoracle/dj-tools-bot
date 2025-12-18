@@ -9,11 +9,11 @@ from mutagen.mp4 import MP4
 from mutagen.flac import FLAC
 
 from dataclasses import dataclass
-import logging
 
+from app.common.logging import get_logger
 from .reader import EnergyZone, get_config
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

@@ -18,16 +18,16 @@ Architecture:
 - Returns drops with confidence scores
 """
 
-import logging
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 from pathlib import Path
 import pickle
 
+from app.common.logging import get_logger
 from .base import BaseTask, AudioContext
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
