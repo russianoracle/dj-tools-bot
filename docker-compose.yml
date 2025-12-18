@@ -135,7 +135,7 @@ services:
       - ./detect-level.lua:/fluent-bit/etc/detect-level.lua:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - app_logs:/var/log/app
+      - /var/log/app:/var/log/app
     depends_on:
       - bot
       - worker
@@ -148,8 +148,6 @@ volumes:
     # Временные загрузки пользователей
   redis_data:
     # Redis persistence (AOF) - очередь задач ARQ
-  app_logs:
-    # Application logs (JSON format, daily rotation)
 
 networks:
   app-network:
