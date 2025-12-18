@@ -160,7 +160,12 @@ jobs:
     name: Push Production Image
     runs-on: self-hosted
     needs: build-and-test
-    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      success() && (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main') ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - uses: actions/checkout@v4
 

@@ -102,9 +102,11 @@ class BatchProgressDisplay:
 
     def update(self, current: int, status: str = "") -> None:
         self.current = current
-        print(f"[{current}/{self.total}] {status}")
+        # Use structured logging instead of print
+        logger = get_logger(__name__)
+        logger.info(f"Progress: [{current}/{self.total}] {status}")
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Type aliases for callbacks
