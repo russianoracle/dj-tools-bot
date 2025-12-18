@@ -30,7 +30,7 @@ from .start import (
     get_main_keyboard,
 )
 from app.common.logging import get_logger
-from app.common.logging.correlation import set_job_id
+from app.common.logging.correlation import set_job_id, get_correlation_id, get_user_id
 
 router = Router()
 logger = get_logger(__name__)
@@ -208,9 +208,18 @@ async def process_url(message: Message, state: FSMContext, bot: Bot):
     try:
         job_id = await enqueue_download_and_analyze(url, user_id)
         set_job_id(job_id)
-        logger.info("URL analysis queued", data={"url": url[:100], "job_id": job_id})
+        logger.info("URL analysis queued", data={
+            "url": url[:100],
+            "job_id": job_id,
+            "user_id": user_id,
+            "correlation_id": get_correlation_id(),
+        })
     except Exception as e:
-        logger.error(f"Failed to queue task: {e}", data={"url": url[:100]})
+        logger.error(f"Failed to queue task: {e}", data={
+            "url": url[:100],
+            "user_id": user_id,
+            "correlation_id": get_correlation_id(),
+        }, exc_info=True)
         await ensure_main_message(
             bot=bot,
             user_id=user_id,
@@ -411,9 +420,15 @@ async def handle_file(message: Message, state: FSMContext, bot: Bot):
                 "file_name": file_name,
                 "file_size_mb": file.file_size // (1024*1024) if file.file_size else 0,
                 "job_id": job_id,
+                "user_id": user_id,
+                "correlation_id": get_correlation_id(),
             })
         except Exception as e:
-            logger.error(f"Failed to queue ARQ task: {e}", data={"file_name": file_name})
+            logger.error(f"Failed to queue ARQ task: {e}", data={
+                "file_name": file_name,
+                "user_id": user_id,
+                "correlation_id": get_correlation_id(),
+            }, exc_info=True)
             job_id = f"job_{file_id}"  # Fallback ID
 
         # Store job
@@ -435,7 +450,11 @@ async def handle_file(message: Message, state: FSMContext, bot: Bot):
         )
 
     except Exception as e:
-        logger.error(f"Failed to process file: {e}", exc_info=True, data={"file_name": file_name})
+        logger.error(f"Failed to process file: {e}", data={
+            "file_name": file_name,
+            "user_id": user_id,
+            "correlation_id": get_correlation_id(),
+        }, exc_info=True)
         await ensure_main_message(
             bot=bot,
             user_id=user_id,
