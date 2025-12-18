@@ -25,6 +25,12 @@ setup_logging(
     enable_yc_logging=False,  # YC logging via fluent-bit
 )
 
+# Configure ARQ framework loggers explicitly
+for arq_logger_name in ["arq.worker", "arq.jobs", "arq"]:
+    arq_logger = logging.getLogger(arq_logger_name)
+    arq_logger.setLevel(logging.INFO)
+    # ARQ loggers will inherit root logger's handlers (JSON format)
+
 logger = get_logger(__name__)
 
 
@@ -145,13 +151,38 @@ def estimate_remaining_time(job_id: str, current_progress: int) -> str:
 def update_job_progress(job_id: str, progress: int, status: str):
     """Update job progress with ETA."""
     eta = estimate_remaining_time(job_id, progress)
-    _job_results[job_id] = {
+    result = {
         "state": "PROGRESS",
         "progress": progress,
         "status": status,
         "eta": eta,
         "updated_at": datetime.now().isoformat(),
     }
+    _job_results[job_id] = result
+
+    # Store in Redis for cross-process access
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If in async context, schedule task
+            asyncio.create_task(_store_progress_in_redis(job_id, result))
+        else:
+            # Sync context - skip Redis (worker will handle)
+            pass
+    except Exception:
+        pass  # Redis update is optional
+
+
+async def _store_progress_in_redis(job_id: str, progress_data: dict):
+    """Store progress in Redis for cross-process access."""
+    try:
+        import json
+        pool = await get_redis_pool()
+        key = f"arq:progress:{job_id}"
+        await pool.set(key, json.dumps(progress_data), ex=3600)  # Expire in 1 hour
+    except Exception as e:
+        logger.warning(f"Failed to store progress in Redis: {e}")
 
 
 async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str, Any]:
@@ -419,6 +450,19 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
                 "status": "✅ Completed",
             }
         elif status == JobStatus.in_progress:
+            # Try to get progress from Redis (cross-process)
+            try:
+                import json
+                key = f"arq:progress:{job_id}"
+                progress_str = await pool.get(key)
+                if progress_str:
+                    return json.loads(progress_str.decode() if isinstance(progress_str, bytes) else progress_str)
+            except Exception:
+                pass
+
+            # Fallback to in-memory progress tracking
+            if job_id in _job_results:
+                return _job_results[job_id]
             return {
                 "state": "PROGRESS",
                 "progress": 50,
