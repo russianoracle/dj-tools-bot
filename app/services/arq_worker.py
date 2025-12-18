@@ -17,6 +17,7 @@ from arq.connections import RedisSettings, ArqRedis
 
 from app.common.logging import get_logger, setup_logging
 from app.common.logging.correlation import set_job_id, set_user_id
+from app.common.monitoring import get_metrics_collector
 
 # Configure JSON logging for ARQ worker and framework
 setup_logging(
@@ -260,6 +261,17 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
         result_dict = result.to_dict() if hasattr(result, "to_dict") else {}
 
         elapsed = time.time() - _job_start_times.get(job_id, time.time())
+
+        # Collect metrics
+        metrics = get_metrics_collector()
+        metrics.record_task_metrics(
+            task_name="analyze_set_task",
+            duration_sec=elapsed,
+            success=result.success,
+            file_duration_sec=result.duration_sec,
+            peak_memory_mb=result.peak_memory_mb,
+        )
+
         logger.info("Analysis completed", data={
             "job_id": job_id,
             "user_id": user_id,
@@ -294,6 +306,17 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
         }
 
     except Exception as e:
+        elapsed = time.time() - _job_start_times.get(job_id, time.time())
+
+        # Record failure metrics
+        metrics = get_metrics_collector()
+        metrics.record_task_metrics(
+            task_name="analyze_set_task",
+            duration_sec=elapsed,
+            success=False,
+            error=str(e)[:200],
+        )
+
         logger.error("Analysis failed", data={
             "job_id": job_id,
             "user_id": user_id,
@@ -390,6 +413,17 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
         return await analyze_set_task(ctx, file_path, user_id)
 
     except Exception as e:
+        elapsed = time.time() - _job_start_times.get(job_id, time.time())
+
+        # Record download failure metrics
+        metrics = get_metrics_collector()
+        metrics.record_task_metrics(
+            task_name="download_and_analyze_task",
+            duration_sec=elapsed,
+            success=False,
+            error=str(e)[:200],
+        )
+
         logger.error("Download failed", data={
             "job_id": job_id,
             "user_id": user_id,

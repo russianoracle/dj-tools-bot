@@ -168,6 +168,7 @@ class SetAnalysisResult:
 
     # Metadata
     processing_time_sec: float = 0.0
+    peak_memory_mb: float = 0.0
     success: bool = True
     error: Optional[str] = None
 
@@ -185,6 +186,7 @@ class SetAnalysisResult:
             'drop_density': self.drop_density,
             'genre_distribution': self.genre_distribution.to_dict() if self.genre_distribution else None,
             'processing_time_sec': self.processing_time_sec,
+            'peak_memory_mb': self.peak_memory_mb,
             'success': self.success,
             'error': self.error,
         }
@@ -797,6 +799,7 @@ class SetAnalysisPipeline(Pipeline):
                 energy_timeline=context.get_result('energy_timeline'),
                 genre_distribution=genre_dist,
                 processing_time_sec=context.results.get('_total_time', 0.0),
+                peak_memory_mb=context.results.get('_peak_memory_mb', 0.0),
                 success=True
             )
         except Exception as e:
@@ -1079,6 +1082,7 @@ class SetBatchAnalyzer:
             energy_timeline=data.get('energy_timeline'),
             genre_distribution=genre_dist,
             processing_time_sec=data.get('processing_time_sec', 0.0),
+            peak_memory_mb=data.get('peak_memory_mb', 0.0),
             success=data.get('success', True),
             error=data.get('error'),
         )

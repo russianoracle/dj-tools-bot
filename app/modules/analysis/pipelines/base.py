@@ -267,11 +267,17 @@ class ComputeSTFTStage(PipelineStage):
 
     def process(self, context: PipelineContext) -> PipelineContext:
         """Compute STFT and create AudioContext."""
+        import psutil
+
         y = context.results.get('_audio')
         sr = context.results.get('_sr')
 
         if y is None or sr is None:
             raise STFTError("Audio not loaded. Run LoadAudioStage first.", data={"file": context.input_path})
+
+        # Track memory usage
+        process = psutil.Process()
+        mem_before_mb = process.memory_info().rss / 1024 / 1024
 
         # Create AudioContext with STFT
         audio_ctx = create_audio_context(
@@ -281,6 +287,21 @@ class ComputeSTFTStage(PipelineStage):
             n_fft=self.n_fft,
             hop_length=self.hop_length
         )
+
+        # Track peak memory
+        mem_after_mb = process.memory_info().rss / 1024 / 1024
+        peak_memory_mb = max(mem_before_mb, mem_after_mb)
+
+        # Store metrics in context
+        context.set_result('_peak_memory_mb', peak_memory_mb)
+        context.set_result('_stft_memory_delta_mb', mem_after_mb - mem_before_mb)
+
+        logger.info("STFT computed", data={
+            "memory_before_mb": round(mem_before_mb, 1),
+            "memory_after_mb": round(mem_after_mb, 1),
+            "memory_delta_mb": round(mem_after_mb - mem_before_mb, 1),
+            "peak_memory_mb": round(peak_memory_mb, 1),
+        })
 
         context.audio_context = audio_ctx
 
