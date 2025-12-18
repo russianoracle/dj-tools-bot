@@ -37,8 +37,8 @@ RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app && \
     chown -R appuser:appuser /data
 
-# Verify key imports
-RUN python -c "import librosa, aiogram, arq; print('✓ App dependencies ready')"
+# Verify key imports (including psutil for monitoring)
+RUN python -c "import librosa, aiogram, arq, psutil; print('✓ App dependencies ready')"
 
 # ============================================================================
 # Usage:
