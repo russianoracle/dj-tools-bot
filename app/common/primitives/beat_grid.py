@@ -509,13 +509,27 @@ def compute_beat_aligned_features(
 
     n_features = feature.shape[0]
     n_segments = len(boundary_frames) - 1
-    result = np.zeros((n_features, n_segments))
+    result = np.zeros((n_features, n_segments), dtype=np.float32)
 
-    for i in range(n_segments):
-        start = boundary_frames[i]
-        end = boundary_frames[i + 1]
-        if end > start:
-            result[:, i] = agg_func(feature[:, start:end], axis=1)
+    # Vectorized aggregation for mean/sum via cumsum (Ice Lake/M2 optimized)
+    if aggregation in ('mean', 'sum'):
+        # Pad cumsum for efficient diff-based segment sums
+        cumsum = np.concatenate([np.zeros((n_features, 1)), np.cumsum(feature, axis=1)], axis=1)
+        sums = cumsum[:, boundary_frames[1:]] - cumsum[:, boundary_frames[:-1]]
+
+        if aggregation == 'mean':
+            counts = np.diff(boundary_frames).astype(np.float32)
+            counts[counts == 0] = 1  # Avoid division by zero
+            result = sums / counts
+        else:
+            result = sums
+    else:
+        # Fallback to loop for max/median (less common)
+        for i in range(n_segments):
+            start = boundary_frames[i]
+            end = boundary_frames[i + 1]
+            if end > start:
+                result[:, i] = agg_func(feature[:, start:end], axis=1)
 
     if is_1d:
         result = result.flatten()
