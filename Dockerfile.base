@@ -26,7 +26,8 @@ ENV PATH="/usr/local/bin:${PATH}"
 # Install yt-dlp for audio downloads
 RUN pip install --no-cache-dir yt-dlp
 
-# Install app-specific Python dependencies (librosa, aiogram, etc)
+# Install app-specific Python dependencies (librosa, aiogram, psutil, etc)
+# Updated 2025-12-18: Added psutil for performance monitoring
 COPY requirements-prod-app.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir --prefer-binary -r requirements-prod-app.txt

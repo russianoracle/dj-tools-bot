@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Build Base Image"]
+    types: [completed]
+    branches: [main]
 
 env:
   REGISTRY: cr.yandex
