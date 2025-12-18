@@ -22,6 +22,9 @@ class MetricsCollector:
     - Task success/failure rates
     """
 
+    # Class-level flag to track if SDK warning was already logged
+    _sdk_warning_logged = False
+
     def __init__(self, enabled: bool = True, folder_id: Optional[str] = None):
         """
         Initialize metrics collector.
@@ -36,6 +39,7 @@ class MetricsCollector:
 
         # YC Monitoring client (lazy init)
         self._monitoring_client = None
+        self._sdk_import_failed = False  # Track if SDK import already failed
 
         if self.enabled:
             logger.info("Metrics collection enabled", data={
@@ -47,6 +51,10 @@ class MetricsCollector:
     @property
     def monitoring_client(self):
         """Lazy initialization of YC Monitoring client."""
+        # If SDK import already failed, skip trying again
+        if self._sdk_import_failed:
+            return None
+
         if self._monitoring_client is None and self.enabled:
             try:
                 from yandex.cloud.monitoring.v3.metric_service_pb2_grpc import MetricServiceStub
@@ -57,11 +65,16 @@ class MetricsCollector:
                 self._monitoring_client = sdk.client(MetricServiceStub)
                 logger.info("YC Monitoring client initialized")
             except ImportError:
-                logger.warning("yandexcloud SDK not installed, metrics disabled")
+                # Only log warning once across all instances
+                if not MetricsCollector._sdk_warning_logged:
+                    logger.info("yandexcloud SDK not installed, metrics disabled")
+                    MetricsCollector._sdk_warning_logged = True
                 self.enabled = False
+                self._sdk_import_failed = True
             except Exception as e:
                 logger.warning(f"Failed to init YC Monitoring: {e}")
                 self.enabled = False
+                self._sdk_import_failed = True
 
         return self._monitoring_client
 
