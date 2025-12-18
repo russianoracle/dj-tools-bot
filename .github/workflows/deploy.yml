@@ -269,6 +269,12 @@ jobs:
           # Stop all services
           docker-compose down || true
 
+          # Copy fluent-bit configuration files
+          echo "Copying fluent-bit configuration files..."
+          cp fluent-bit.conf /home/ubuntu/app/ 2>/dev/null || echo "fluent-bit.conf not found"
+          cp parsers.conf /home/ubuntu/app/ 2>/dev/null || echo "parsers.conf not found"
+          cp set-source.lua /home/ubuntu/app/ 2>/dev/null || echo "set-source.lua not found"
+
           # Start all services with docker-compose
           docker-compose up -d
 
