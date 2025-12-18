@@ -131,6 +131,7 @@ services:
     volumes:
       - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
       - ./parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - ./set-source.lua:/fluent-bit/etc/set-source.lua:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
