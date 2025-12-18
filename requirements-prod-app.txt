@@ -1,8 +1,8 @@
 # ============================================================================
 # APP-SPECIFIC PRODUCTION DEPENDENCIES
 # ============================================================================
-# Используется с base image python-scientific:3.12 который уже содержит:
-# - numpy, scipy, scikit-learn, pandas, numba, essentia-tensorflow
+# Used with app-base:3.12 which includes:
+# - numpy, scipy, scikit-learn (installed in Dockerfile.base)
 
 # Audio Processing (БЕЗ numpy/scipy - они в base)
 librosa>=0.10.0

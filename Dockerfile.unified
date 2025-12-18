@@ -11,8 +11,8 @@ ARG REGISTRY_ID=crp78hhr2t67jkeedad1
 
 # ============================================================================
 # STAGE 1: App Base (pre-built, pulled from registry)
-# Contains: python-scientific + ffmpeg + yt-dlp + requirements-prod-app.txt
-# Rebuild manually: make build-base (only when dependencies change)
+# Contains: python:3.12-slim + numpy/scipy + ffmpeg + yt-dlp + app deps
+# Rebuild: automatically via build-base.yml on Dockerfile.base changes
 # ============================================================================
 FROM ${REGISTRY}/${REGISTRY_ID}/app-base:${PYTHON_VERSION} AS app-base
 
