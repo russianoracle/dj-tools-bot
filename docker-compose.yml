@@ -122,6 +122,7 @@ services:
     image: cr.yandex/yc/fluent-bit-plugin-yandex:v1.0.4-fluent-bit-1.8.6
     container_name: mood-fluent-bit
     restart: unless-stopped
+    network_mode: host
     env_file:
       - .env
     environment:
@@ -132,8 +133,6 @@ services:
       - ./parsers.conf:/fluent-bit/etc/parsers.conf:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - app-network
     depends_on:
       - bot
       - worker
