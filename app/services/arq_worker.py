@@ -375,18 +375,15 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
 async def get_job_status(job_id: str) -> Dict[str, Any]:
     """Get job status from Redis (ARQ result)."""
     try:
-        pool = await get_redis_pool()
-        job = await pool.job(job_id)
-        if job is None:
-            return {
-                "state": "PENDING",
-                "progress": 0,
-                "status": "Waiting in queue...",
-            }
+        from arq.jobs import Job, JobStatus
 
-        # Get job info
-        info = await job.info()
-        if info is None:
+        pool = await get_redis_pool()
+        job = Job(job_id, pool)
+
+        # Get job status
+        status = await job.status()
+
+        if status == JobStatus.not_found:
             return {
                 "state": "PENDING",
                 "progress": 0,
@@ -394,8 +391,7 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
             }
 
         # Map ARQ status to our format
-        from arq.jobs import JobStatus
-        if info.status == JobStatus.complete:
+        if status == JobStatus.complete:
             result = await job.result()
             if isinstance(result, dict):
                 if result.get("status") == "failed":
@@ -415,23 +411,29 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
                 "progress": 100,
                 "status": "✅ Completed",
             }
-        elif info.status == JobStatus.in_progress:
+        elif status == JobStatus.in_progress:
             return {
                 "state": "PROGRESS",
                 "progress": 50,
                 "status": "🔄 Processing...",
             }
-        elif info.status == JobStatus.deferred:
+        elif status == JobStatus.deferred:
             return {
                 "state": "PENDING",
                 "progress": 0,
                 "status": "⏳ Scheduled...",
             }
-        else:
+        elif status == JobStatus.queued:
             return {
                 "state": "PENDING",
                 "progress": 0,
                 "status": "Waiting in queue...",
+            }
+        else:
+            return {
+                "state": "UNKNOWN",
+                "progress": 0,
+                "status": f"Unknown status: {status}",
             }
     except Exception as e:
         logger.warning(f"Failed to get job status: {e}")
