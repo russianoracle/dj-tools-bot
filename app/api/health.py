@@ -17,6 +17,7 @@ from fastapi import APIRouter, Response, status
 from pydantic import BaseModel
 
 from app.common.logging import get_logger
+from app.core.cache import CacheRepository
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -138,6 +139,33 @@ def get_arq_health() -> Dict[str, Any]:
         }
 
 
+def get_cache_health() -> Dict[str, Any]:
+    """Check cache repository health."""
+    try:
+        repo = CacheRepository.get_instance()
+        stats = repo.get_cache_stats()
+
+        # Check if cache directories are accessible
+        stft_dir_exists = repo.stft_dir.exists()
+        features_dir_exists = repo.features_dir.exists()
+
+        return {
+            "status": "healthy",
+            "sets_cached": stats.set_count,
+            "tracks_cached": stats.track_count,
+            "profiles_cached": stats.profile_count,
+            "total_size_mb": stats.total_size_mb,
+            "stft_dir_accessible": stft_dir_exists,
+            "features_dir_accessible": features_dir_exists,
+        }
+    except Exception as e:
+        logger.error(f"Cache health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+        }
+
+
 @router.get("/health", response_model=HealthStatus)
 async def health_check():
     """
@@ -163,7 +191,7 @@ async def readiness_check(response: Response):
     """
     Readiness check endpoint (readiness probe).
 
-    Checks all dependencies (Redis, disk, memory, ARQ).
+    Checks all dependencies (Redis, disk, memory, ARQ, cache repository).
     Returns 200 if ready, 503 if not ready.
     """
     checks = {
@@ -171,6 +199,7 @@ async def readiness_check(response: Response):
         "disk": get_disk_health(),
         "memory": get_memory_health(),
         "arq": get_arq_health(),
+        "cache": get_cache_health(),
     }
 
     # Determine overall readiness
@@ -194,7 +223,7 @@ async def metrics():
     """
     Prometheus-compatible metrics endpoint.
 
-    Exposes system metrics in Prometheus exposition format.
+    Exposes system metrics and cache statistics in Prometheus exposition format.
     """
     uptime = time.time() - _start_time
 
@@ -216,6 +245,21 @@ async def metrics():
         arq_queued = r.llen("arq:queue") or 0
     except Exception:
         pass
+
+    # Get cache metrics
+    cache_sets = 0
+    cache_tracks = 0
+    cache_profiles = 0
+    cache_size_mb = 0.0
+    try:
+        repo = CacheRepository.get_instance()
+        stats = repo.get_cache_stats()
+        cache_sets = stats.set_count
+        cache_tracks = stats.track_count
+        cache_profiles = stats.profile_count
+        cache_size_mb = stats.total_size_mb
+    except Exception as e:
+        logger.warning(f"Failed to get cache metrics: {e}")
 
     # Get downloads directory metrics
     downloads_dir = os.getenv("DOWNLOADS_DIR", "/tmp/downloads")
@@ -254,6 +298,22 @@ async def metrics():
         "# HELP mood_classifier_arq_active_jobs Number of active ARQ jobs",
         "# TYPE mood_classifier_arq_active_jobs gauge",
         f"mood_classifier_arq_active_jobs {arq_active}",
+        "",
+        "# HELP mood_classifier_cache_sets_count Number of cached set analyses",
+        "# TYPE mood_classifier_cache_sets_count gauge",
+        f"mood_classifier_cache_sets_count {cache_sets}",
+        "",
+        "# HELP mood_classifier_cache_tracks_count Number of cached track analyses",
+        "# TYPE mood_classifier_cache_tracks_count gauge",
+        f"mood_classifier_cache_tracks_count {cache_tracks}",
+        "",
+        "# HELP mood_classifier_cache_profiles_count Number of cached DJ profiles",
+        "# TYPE mood_classifier_cache_profiles_count gauge",
+        f"mood_classifier_cache_profiles_count {cache_profiles}",
+        "",
+        "# HELP mood_classifier_cache_size_mb Total size of cache in MB",
+        "# TYPE mood_classifier_cache_size_mb gauge",
+        f"mood_classifier_cache_size_mb {cache_size_mb:.2f}",
         "",
         "# HELP mood_classifier_downloads_count Number of files in downloads directory",
         "# TYPE mood_classifier_downloads_count gauge",

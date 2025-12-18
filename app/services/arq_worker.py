@@ -15,7 +15,10 @@ from typing import Optional, Dict, Any
 from arq import create_pool
 from arq.connections import RedisSettings, ArqRedis
 
-logger = logging.getLogger(__name__)
+from app.common.logging import get_logger
+from app.common.logging.correlation import set_job_id, set_user_id
+
+logger = get_logger(__name__)
 
 
 # ============================================================================
@@ -416,7 +419,16 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
         Analysis result dict
     """
     job_id = ctx.get("job_id", "unknown")
-    logger.info(f"[{job_id}] Starting set analysis: {file_path}")
+
+    # Set context for logging
+    set_job_id(job_id)
+    set_user_id(user_id)
+
+    logger.info("Starting set analysis", data={
+        "job_id": job_id,
+        "user_id": user_id,
+        "file_path": file_path,
+    })
 
     # Start timing
     _job_start_times[job_id] = time.time()
@@ -467,12 +479,22 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
         result_dict = result.to_dict() if hasattr(result, "to_dict") else {}
 
         elapsed = time.time() - _job_start_times.get(job_id, time.time())
-        logger.info(f"[{job_id}] Analysis completed in {elapsed:.1f}s: {result.n_segments} segments, {result.total_drops} drops")
+        logger.info("Analysis completed", data={
+            "job_id": job_id,
+            "user_id": user_id,
+            "elapsed_sec": round(elapsed, 1),
+            "n_segments": result.n_segments,
+            "total_drops": result.total_drops,
+            "success": result.success,
+        })
 
         # Cleanup file
         if os.path.exists(file_path):
             os.remove(file_path)
-            logger.info(f"[{job_id}] Cleaned up: {file_path}")
+            logger.debug("Cleaned up temp file", data={
+                "job_id": job_id,
+                "file_path": file_path,
+            })
 
         # Store result
         _job_results[job_id] = {
@@ -491,14 +513,23 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
         }
 
     except Exception as e:
-        logger.error(f"[{job_id}] Analysis failed: {e}")
+        logger.error("Analysis failed", data={
+            "job_id": job_id,
+            "user_id": user_id,
+            "file_path": file_path,
+            "error": str(e),
+        }, exc_info=True)
 
         # Cleanup on error
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-            except Exception:
-                pass
+            except Exception as cleanup_error:
+                logger.warning("Failed to cleanup temp file", data={
+                    "job_id": job_id,
+                    "file_path": file_path,
+                    "error": str(cleanup_error),
+                })
 
         _job_results[job_id] = {
             "state": "FAILURE",
@@ -530,13 +561,22 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
     import uuid
 
     job_id = ctx.get("job_id", "unknown")
+
+    # Set context for logging
+    set_job_id(job_id)
+    set_user_id(user_id)
+
     downloads_dir = os.getenv("DOWNLOADS_DIR", "/tmp/downloads")
     os.makedirs(downloads_dir, exist_ok=True)
 
     file_id = str(uuid.uuid4())[:8]
     output_template = os.path.join(downloads_dir, f"{file_id}.%(ext)s")
 
-    logger.info(f"[{job_id}] Downloading: {url}")
+    logger.info("Starting download and analysis", data={
+        "job_id": job_id,
+        "user_id": user_id,
+        "url": url[:100],
+    })
 
     # Start timing
     _job_start_times[job_id] = time.time()
@@ -558,13 +598,23 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
             raise Exception("Downloaded file not found")
 
         download_time = time.time() - _job_start_times[job_id]
-        logger.info(f"[{job_id}] Downloaded in {download_time:.1f}s: {file_path}")
+        logger.info("Download completed", data={
+            "job_id": job_id,
+            "user_id": user_id,
+            "download_time_sec": round(download_time, 1),
+            "file_path": file_path,
+        })
 
         # Run analysis (will continue using same job timing)
         return await analyze_set_task(ctx, file_path, user_id)
 
     except Exception as e:
-        logger.error(f"[{job_id}] Download failed: {e}")
+        logger.error("Download failed", data={
+            "job_id": job_id,
+            "user_id": user_id,
+            "url": url[:100],
+            "error": str(e),
+        }, exc_info=True)
 
         _job_results[job_id] = {
             "state": "FAILURE",

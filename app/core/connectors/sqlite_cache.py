@@ -6,9 +6,10 @@ Implements CacheProtocol, SetCacheProtocol, and DJProfileCacheProtocol.
 """
 
 from typing import Optional, Any, Dict, List
-import logging
 
-logger = logging.getLogger(__name__)
+from app.common.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class SQLiteCache:

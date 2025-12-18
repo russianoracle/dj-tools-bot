@@ -5,7 +5,6 @@ Uses single message architecture.
 """
 
 import os
-import logging
 import sys
 
 from aiogram import Router, F, Bot
@@ -13,6 +12,7 @@ from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
+from app.common.logging import get_logger
 from ..keyboards.inline import get_admin_keyboard, get_back_keyboard, get_cancel_keyboard
 from .start import (
     is_admin,
@@ -24,7 +24,7 @@ from .start import (
 from .analyze import user_jobs, get_disk_usage
 
 router = Router()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AdminStates(StatesGroup):

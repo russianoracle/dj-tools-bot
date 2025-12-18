@@ -6,16 +6,16 @@ that gets edited for all interactions. User messages are deleted.
 """
 
 import time
-import logging
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
+from app.common.logging import get_logger
 from ..keyboards.inline import get_main_keyboard, get_back_keyboard
 
 router = Router()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # In-memory banned users (use Redis in production)
 banned_users: set = set()

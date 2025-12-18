@@ -40,6 +40,29 @@ class JSONFormatter(logging.Formatter):
         self.include_path = include_path
         self.extra_fields = extra_fields or {}
 
+    @staticmethod
+    def _extract_component(logger_name: str) -> str:
+        """
+        Extract component name from logger hierarchy.
+
+        Examples:
+            app.modules.bot.handlers.analyze -> bot.handlers.analyze
+            app.common.logging.logger -> common.logging
+            app.modules.analysis.tasks.key_analysis -> analysis.tasks.key_analysis
+            __main__ -> main
+        """
+        if logger_name == "__main__":
+            return "main"
+
+        parts = logger_name.split(".")
+        # Remove "app" and "modules" prefixes
+        if parts[0] == "app":
+            parts = parts[1:]
+        if parts and parts[0] == "modules":
+            parts = parts[1:]
+
+        return ".".join(parts) if parts else logger_name
+
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON string."""
         log_entry: dict[str, Any] = {}
@@ -52,6 +75,10 @@ class JSONFormatter(logging.Formatter):
 
         if self.include_level:
             log_entry["level"] = record.levelname
+
+        # Component extraction (e.g., "bot.handlers.analyze" from "app.modules.bot.handlers.analyze")
+        component = self._extract_component(record.name)
+        log_entry["component"] = component
 
         if self.include_logger:
             log_entry["logger"] = record.name

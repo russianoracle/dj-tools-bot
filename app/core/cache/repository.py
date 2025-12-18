@@ -41,11 +41,11 @@ Architecture:
 
 import os
 import time
-import logging
 import numpy as np
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, TYPE_CHECKING
 
+from app.common.logging import get_logger
 from .models import (
     CachedSetAnalysis,
     CachedTrackAnalysis,
@@ -57,7 +57,7 @@ from app.modules.analysis.pipelines.cache_manager import CacheManager
 if TYPE_CHECKING:
     from ..primitives import STFTCache
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CacheRepository(ICacheStatusProvider):

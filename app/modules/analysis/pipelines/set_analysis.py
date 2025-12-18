@@ -17,7 +17,10 @@ from pathlib import Path
 import numpy as np
 from collections import Counter
 
-logger = logging.getLogger(__name__)
+from app.common.logging import get_logger
+from app.common.logging.correlation import get_correlation_id, get_user_id, get_job_id
+
+logger = get_logger(__name__)
 
 from .base import (
     Pipeline, PipelineContext, PipelineStage,
@@ -208,9 +211,22 @@ class DetectTransitionsStage(PipelineStage):
 
     def process(self, context: PipelineContext) -> PipelineContext:
         if context.audio_context is None:
+            logger.error("AudioContext required for transition detection", data={
+                "correlation_id": get_correlation_id(),
+                "job_id": get_job_id(),
+            })
             raise ValueError("AudioContext required")
 
+        logger.debug("Detecting transitions", data={
+            "correlation_id": get_correlation_id(),
+            "job_id": get_job_id(),
+        })
         result = self.task.execute(context.audio_context)
+        logger.info("Transitions detected", data={
+            "n_transitions": result.n_transitions if result else 0,
+            "correlation_id": get_correlation_id(),
+            "job_id": get_job_id(),
+        })
         context.set_result('transitions', result)
         return context
 
@@ -337,13 +353,25 @@ class LaplacianSegmentationStage(PipelineStage):
 
     def process(self, context: PipelineContext) -> PipelineContext:
         if context.audio_context is None:
+            logger.error("AudioContext required for segmentation", data={
+                "correlation_id": get_correlation_id(),
+                "job_id": get_job_id(),
+            })
             raise ValueError("AudioContext required")
 
+        logger.debug("Running Laplacian segmentation", data={
+            "correlation_id": get_correlation_id(),
+            "job_id": get_job_id(),
+        })
         result = self.task.execute(context.audio_context)
         context.set_result('laplacian_segmentation', result)
 
         if not result.success:
-            logger.warning(f"Laplacian segmentation failed: {result.error}")
+            logger.warning("Laplacian segmentation failed", data={
+                "error": result.error,
+                "correlation_id": get_correlation_id(),
+                "job_id": get_job_id(),
+            })
             return context
 
         # Convert boundaries to SegmentInfo
@@ -362,7 +390,12 @@ class LaplacianSegmentationStage(PipelineStage):
                 ))
 
         context.set_result('segments', segments)
-        logger.info(f"Laplacian segmentation: {len(segments)} segments (tempo={result.tempo:.1f} BPM)")
+        logger.info("Laplacian segmentation complete", data={
+            "n_segments": len(segments),
+            "tempo_bpm": round(result.tempo, 1),
+            "correlation_id": get_correlation_id(),
+            "job_id": get_job_id(),
+        })
         return context
 
 
@@ -437,7 +470,10 @@ class AnalyzeSegmentGenresStage(PipelineStage):
 
         segments: List[SegmentInfo] = context.get_result('segments', [])
         if not segments:
-            logger.info("No segments to analyze")
+            logger.info("No segments to analyze", data={
+                "correlation_id": get_correlation_id(),
+                "job_id": get_job_id(),
+            })
             return context
 
         y = context.audio_context.y
@@ -448,7 +484,12 @@ class AnalyzeSegmentGenresStage(PipelineStage):
         valid_mask = seg_times[:, 2] >= self.min_segment_duration
         valid_indices = np.where(valid_mask)[0]
 
-        logger.info(f"Analyzing genres for {len(valid_indices)}/{len(segments)} segments")
+        logger.info("Analyzing genres per segment", data={
+            "n_valid_segments": len(valid_indices),
+            "total_segments": len(segments),
+            "correlation_id": get_correlation_id(),
+            "job_id": get_job_id(),
+        })
         segment_genres: List[SegmentGenre] = []
 
         for i, idx in enumerate(valid_indices):
@@ -460,7 +501,14 @@ class AnalyzeSegmentGenresStage(PipelineStage):
             if len(segment_y) < sr * 10:
                 continue
 
-            logger.info(f"  Segment {i+1}/{len(valid_indices)}: {segment.start_time/60:.1f}-{segment.end_time/60:.1f}min")
+            logger.debug("Analyzing segment genre", data={
+                "segment_idx": i+1,
+                "total_segments": len(valid_indices),
+                "start_min": round(segment.start_time/60, 1),
+                "end_min": round(segment.end_time/60, 1),
+                "correlation_id": get_correlation_id(),
+                "job_id": get_job_id(),
+            })
             try:
                 segment_ctx = create_audio_context(segment_y, sr)
                 result = self.task.execute(segment_ctx)
@@ -475,13 +523,34 @@ class AnalyzeSegmentGenresStage(PipelineStage):
                         mood_tags=result.mood_tags,
                     )
                     segment_genres.append(segment.genre)
-                    logger.info(f"    -> {result.genre} ({result.dj_category}) conf={result.confidence:.2f}")
+                    logger.info("Segment genre detected", data={
+                        "segment_idx": i+1,
+                        "genre": result.genre,
+                        "dj_category": result.dj_category,
+                        "confidence": round(result.confidence, 2),
+                        "correlation_id": get_correlation_id(),
+                        "job_id": get_job_id(),
+                    })
                 else:
-                    logger.warning(f"    -> Genre analysis failed: {result.error}")
+                    logger.warning("Genre analysis failed for segment", data={
+                        "segment_idx": i+1,
+                        "error": result.error,
+                        "correlation_id": get_correlation_id(),
+                        "job_id": get_job_id(),
+                    })
             except Exception as e:
-                logger.error(f"    -> Exception: {e}")
+                logger.error("Exception during genre analysis", data={
+                    "segment_idx": i+1,
+                    "error": str(e),
+                    "correlation_id": get_correlation_id(),
+                    "job_id": get_job_id(),
+                }, exc_info=True)
 
-        logger.info(f"Genre analysis complete: {len(segment_genres)} genres extracted")
+        logger.info("Genre analysis complete", data={
+            "n_genres_extracted": len(segment_genres),
+            "correlation_id": get_correlation_id(),
+            "job_id": get_job_id(),
+        })
         if segment_genres:
             genre_dist = self._compute_distribution(segment_genres)
             context.set_result('genre_distribution', genre_dist)
