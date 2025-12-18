@@ -1,0 +1,53 @@
+name: Build Base Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile.base'
+      - 'requirements-prod-app.txt'
+  workflow_dispatch:  # Manual trigger
+
+env:
+  REGISTRY: cr.yandex
+  REGISTRY_ID: crp78hhr2t67jkeedad1
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build-base:
+    name: Build and Push app-base
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Yandex Container Registry
+        run: |
+          echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login \
+            ${{ env.REGISTRY }} \
+            --username json_key \
+            --password-stdin
+
+      - name: Build and push app-base image
+        run: |
+          echo "🔧 Building app-base:${{ env.PYTHON_VERSION }}"
+
+          docker buildx build \
+            -f Dockerfile.base \
+            --build-arg REGISTRY=${{ env.REGISTRY }} \
+            --build-arg REGISTRY_ID=${{ env.REGISTRY_ID }} \
+            --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
+            --push \
+            -t ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }} \
+            .
+
+          echo "✅ app-base:${{ env.PYTHON_VERSION }} pushed to registry"
+
+      - name: Verify image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }}
+          docker run --rm ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }} \
+            python -c "import librosa, aiogram, arq, psutil; print('✓ Dependencies verified')"
+
+      - name: Logout from registry
+        if: always()
+        run: docker logout ${{ env.REGISTRY }} || true
