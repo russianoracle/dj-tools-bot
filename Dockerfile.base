@@ -17,21 +17,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
-    unzip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install deno (required for yt-dlp YouTube extraction)
 RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
 ENV PATH="/usr/local/bin:${PATH}"
-
-# Install xray-core for VLESS/Shadowsocks proxy support
-RUN XRAY_VERSION="1.8.24" && \
-    curl -fsSL "https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-64.zip" -o /tmp/xray.zip && \
-    unzip -o /tmp/xray.zip -d /tmp/xray && \
-    mv /tmp/xray/xray /usr/local/bin/xray && \
-    chmod +x /usr/local/bin/xray && \
-    rm -rf /tmp/xray /tmp/xray.zip && \
-    xray version
 
 # Install yt-dlp for audio downloads
 RUN pip install --no-cache-dir yt-dlp

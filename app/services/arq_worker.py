@@ -22,334 +22,77 @@ logger = get_logger(__name__)
 
 
 # ============================================================================
-# Proxy Rotation with xray-core for VLESS/SS
-# ============================================================================
-
-import json
-import socket
-import tempfile
-import shutil
-from typing import List
-
-# Proxy configs from Happ subscription (tested working for SoundCloud, YT, Discord)
-_PROXY_CONFIGS: List[dict] = [
-    # VLESS gRPC - RU (WORKS for SoundCloud, YT, Discord, Instagram)
-    {
-        "name": "RU-VLESS-gRPC",
-        "local_port": 10808,
-        "outbound": {
-            "protocol": "vless",
-            "settings": {
-                "vnext": [{
-                    "address": "193.233.231.221",
-                    "port": 8443,
-                    "users": [{
-                        "id": "362229f7-9a9c-4810-8986-a2377f7d3bf9",
-                        "encryption": "none",
-                        "level": 8
-                    }]
-                }]
-            },
-            "streamSettings": {
-                "network": "grpc",
-                "security": "none",
-                "grpcSettings": {
-                    "serviceName": "",
-                    "multiMode": False
-                }
-            }
-        }
-    },
-    # Shadowsocks - UK (backup, works for YT but not SoundCloud)
-    {
-        "name": "UK-SS",
-        "local_port": 10809,
-        "outbound": {
-            "protocol": "shadowsocks",
-            "settings": {
-                "servers": [{
-                    "address": "144.31.178.150",
-                    "port": 8080,
-                    "method": "chacha20-ietf-poly1305",
-                    "password": "UPm3HNg8x4uAzAxThpaSnABG9uRoJa3j"
-                }]
-            },
-            "streamSettings": {
-                "network": "tcp",
-                "security": "none"
-            }
-        }
-    },
-]
-
-_current_proxy_idx = 0
-_failed_proxies: set = set()
-_xray_process: Optional[subprocess.Popen] = None
-_xray_config_file: Optional[str] = None
-
-
-def _is_xray_available() -> bool:
-    """Check if xray-core is installed."""
-    return shutil.which("xray") is not None
-
-
-def _is_port_open(port: int) -> bool:
-    """Check if local port is listening."""
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1)
-            return s.connect_ex(("127.0.0.1", port)) == 0
-    except Exception:
-        return False
-
-
-def _start_xray_proxy(config: dict) -> bool:
-    """Start xray with given config. Returns True if successful."""
-    global _xray_process, _xray_config_file
-
-    if not _is_xray_available():
-        logger.warning("xray-core not installed, skipping proxy")
-        return False
-
-    # Stop existing xray
-    _stop_xray_proxy()
-
-    # Build xray config
-    local_port = config["local_port"]
-    xray_config = {
-        "log": {"loglevel": "warning"},
-        "inbounds": [{
-            "port": local_port,
-            "listen": "127.0.0.1",
-            "protocol": "socks",
-            "settings": {"udp": True}
-        }],
-        "outbounds": [config["outbound"]]
-    }
-
-    # Write config to temp file
-    try:
-        fd, config_path = tempfile.mkstemp(suffix=".json", prefix="xray_")
-        with os.fdopen(fd, "w") as f:
-            json.dump(xray_config, f)
-        _xray_config_file = config_path
-
-        # Start xray
-        _xray_process = subprocess.Popen(
-            ["xray", "run", "-c", config_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE
-        )
-
-        # Wait for proxy to start
-        for _ in range(10):
-            time.sleep(0.5)
-            if _is_port_open(local_port):
-                logger.info(f"Started xray proxy on port {local_port} ({config['name']})")
-                return True
-
-        # Failed to start
-        logger.warning(f"xray failed to start for {config['name']}")
-        _stop_xray_proxy()
-        return False
-
-    except Exception as e:
-        logger.error(f"Failed to start xray: {e}")
-        _stop_xray_proxy()
-        return False
-
-
-def _stop_xray_proxy() -> None:
-    """Stop xray process and cleanup."""
-    global _xray_process, _xray_config_file
-
-    if _xray_process:
-        try:
-            _xray_process.terminate()
-            _xray_process.wait(timeout=5)
-        except Exception:
-            try:
-                _xray_process.kill()
-            except Exception:
-                pass
-        _xray_process = None
-
-    if _xray_config_file and os.path.exists(_xray_config_file):
-        try:
-            os.remove(_xray_config_file)
-        except Exception:
-            pass
-        _xray_config_file = None
-
-
-def get_next_proxy() -> Optional[str]:
-    """Get next working proxy URL. Starts xray if needed."""
-    global _current_proxy_idx
-
-    # First try env var (custom proxy)
-    env_proxy = os.getenv("YTDLP_PROXY")
-    if env_proxy:
-        return env_proxy
-
-    # No configs - direct connection
-    if not _PROXY_CONFIGS:
-        return None
-
-    # Try to start next proxy
-    attempts = 0
-    while attempts < len(_PROXY_CONFIGS):
-        idx = _current_proxy_idx % len(_PROXY_CONFIGS)
-        config = _PROXY_CONFIGS[idx]
-        _current_proxy_idx += 1
-
-        if config["name"] in _failed_proxies:
-            attempts += 1
-            continue
-
-        # Try to start this proxy
-        if _start_xray_proxy(config):
-            return f"socks5://127.0.0.1:{config['local_port']}"
-
-        # Failed, mark and try next
-        _failed_proxies.add(config["name"])
-        attempts += 1
-
-    # All failed, reset and try direct
-    logger.warning("All proxies failed, using direct connection")
-    _failed_proxies.clear()
-    return None
-
-
-def mark_proxy_failed(proxy: Optional[str]) -> None:
-    """Mark current proxy as failed."""
-    global _current_proxy_idx
-    if proxy and _PROXY_CONFIGS and _current_proxy_idx > 0:
-        idx = (_current_proxy_idx - 1) % len(_PROXY_CONFIGS)
-        name = _PROXY_CONFIGS[idx]["name"]
-        _failed_proxies.add(name)
-        logger.info(f"Marked proxy as failed: {name}")
-        _stop_xray_proxy()
-
-
-# ============================================================================
-# Download with yt-dlp (supports geo-bypass via extractor args)
+# Download with yt-dlp
 # ============================================================================
 
 
-def download_audio(url: str, output_template: str, max_retries: int = 3) -> str:
+def download_audio(url: str, output_template: str) -> str:
     """
-    Download audio using yt-dlp with proxy rotation.
-
-    Tries direct first, then rotates through VLESS/SS proxies via xray.
+    Download audio using yt-dlp via NAT Gateway.
 
     Args:
         url: Audio URL (SoundCloud, YouTube, etc.)
         output_template: Output path template with %(ext)s
-        max_retries: Number of retry attempts
 
     Returns:
         Path to downloaded file (without extension placeholder)
 
     Raises:
-        Exception if all attempts fail
+        Exception if download fails
     """
-    last_error = None
-    current_proxy = None
+    logger.info(f"Download attempt via NAT Gateway")
 
-    for attempt in range(max_retries):
-        # Get proxy (starts xray if needed)
-        current_proxy = get_next_proxy()
-        proxy_desc = current_proxy[:30] + "..." if current_proxy else "direct"
+    cmd = [
+        "yt-dlp",
+        "-x",
+        "--audio-format", "mp3",
+        "--audio-quality", "0",
+        "-o", output_template,
+        "--max-filesize", "500M",
+        "--no-warnings",
+        "--socket-timeout", "60",
+        # Geo-bypass options
+        "--geo-bypass",
+        "--geo-bypass-country", "US",
+        # User-agent to avoid bot detection
+        "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        # Retry on network errors (yt-dlp internal retries)
+        "--retries", "3",
+        "--fragment-retries", "3",
+        url,
+    ]
 
-        logger.info(f"Download attempt {attempt + 1}/{max_retries} via {proxy_desc}")
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 min timeout for large files
+        )
 
-        cmd = [
-            "yt-dlp",
-            "-x",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "-o", output_template,
-            "--max-filesize", "500M",
-            "--no-warnings",
-            "--socket-timeout", "60",
-            # Geo-bypass options
-            "--geo-bypass",
-            "--geo-bypass-country", "US",
-            # User-agent to avoid bot detection
-            "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-            # Retry on network errors
-            "--retries", "3",
-            "--fragment-retries", "3",
-        ]
+        if result.returncode == 0:
+            logger.info("Download successful via NAT Gateway")
+            return output_template.replace(".%(ext)s", "")
 
-        # Add proxy if available
-        if current_proxy:
-            cmd.extend(["--proxy", current_proxy])
-            logger.info(f"Using proxy: {proxy_desc}")
+        # Download failed
+        stderr = result.stderr
+        stdout = result.stdout
+        error_msg = stderr[:300] if stderr else stdout[:300]
+        logger.warning(f"Download failed: {error_msg}")
+        raise Exception(f"yt-dlp failed: {error_msg}")
 
-        cmd.append(url)
+    except subprocess.TimeoutExpired:
+        logger.warning("Download timeout (300s)")
+        raise Exception("Download timeout after 300s")
 
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 min timeout for large files
-            )
-
-            if result.returncode == 0:
-                logger.info(f"Download successful via {proxy_desc}")
-                _stop_xray_proxy()  # Cleanup after success
-                return output_template.replace(".%(ext)s", "")
-
-            # Log error details
-            stderr = result.stderr
-            stdout = result.stdout
-
-            # Check specific errors
-            if "403" in stderr or "forbidden" in stderr.lower():
-                last_error = f"Geo-blocked via {proxy_desc}"
-                logger.warning(f"Geo-blocked via {proxy_desc}: {stderr[:150]}")
-                mark_proxy_failed(current_proxy)
-                continue  # Try next proxy
-            elif "Sign in" in stderr or "age" in stderr.lower():
-                last_error = "Age-restricted content. Requires authentication."
-                logger.warning(f"Age-restricted: {stderr[:200]}")
-            elif "not available" in stderr.lower():
-                last_error = "Content not available in this region."
-                logger.warning(f"Not available: {stderr[:200]}")
-                mark_proxy_failed(current_proxy)
-                continue  # Try next proxy
-            elif "proxy" in stderr.lower() or "tunnel" in stderr.lower():
-                last_error = f"Proxy connection failed: {proxy_desc}"
-                logger.warning(f"Proxy error: {stderr[:150]}")
-                mark_proxy_failed(current_proxy)
-                continue  # Try next proxy
-            else:
-                last_error = stderr[:300] if stderr else stdout[:300]
-                logger.warning(f"Download error: {last_error}")
-
-            # Wait before retry
-            if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)  # Exponential backoff
-
-        except subprocess.TimeoutExpired:
-            last_error = f"Download timeout via {proxy_desc}"
-            logger.warning(f"Download timeout via {proxy_desc}")
-            mark_proxy_failed(current_proxy)
-
-        except Exception as e:
-            last_error = str(e)
-            logger.error(f"Download exception: {e}")
-            mark_proxy_failed(current_proxy)
-
-    _stop_xray_proxy()  # Cleanup on failure
-    raise Exception(f"Download failed after {max_retries} attempts: {last_error}")
+    except Exception as e:
+        logger.error(f"Download exception: {e}")
+        raise
 
 
-def download_with_failover(url: str, output_template: str, max_retries: int = 3) -> str:
+def download_with_failover(url: str, output_template: str) -> str:
     """Alias for download_audio (backwards compatibility)."""
-    return download_audio(url, output_template, max_retries)
+    return download_audio(url, output_template)
 
 # Redis settings
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -584,8 +327,8 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
     update_job_progress(job_id, 5, "📥 Downloading audio...")
 
     try:
-        # Download audio (with geo-bypass options)
-        download_audio(url, output_template, max_retries=3)
+        # Download audio via NAT Gateway
+        download_audio(url, output_template)
 
         # Find downloaded file
         file_path = None
