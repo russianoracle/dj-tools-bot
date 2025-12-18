@@ -316,7 +316,7 @@ jobs:
     name: Cleanup VM Trash Files
     runs-on: self-hosted
     needs: deploy
-    if: success()
+    if: always()
     steps:
       - name: Cleanup trash files on VM
         run: |
