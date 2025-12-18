@@ -86,8 +86,9 @@ class JSONFormatter(logging.Formatter):
         if self.include_path:
             log_entry["path"] = f"{record.pathname}:{record.lineno}"
 
-        # Message
-        log_entry["message"] = record.getMessage()
+        # Message (ensure non-empty)
+        message = record.getMessage()
+        log_entry["message"] = message if message and message.strip() else "[Empty log message]"
 
         # Correlation ID
         if hasattr(record, "correlation_id") and record.correlation_id:
@@ -171,26 +172,45 @@ class StructuredLogAdapter(logging.LoggerAdapter):
         kwargs["extra"] = extra
         return msg, kwargs
 
+    def _validate_message(self, msg: str) -> str:
+        """
+        Validate and sanitize log message.
+
+        Args:
+            msg: Log message to validate
+
+        Returns:
+            Validated message (fallback if empty)
+        """
+        if not msg or not msg.strip():
+            # Return placeholder for empty messages to avoid empty log records
+            return "[Empty log message]"
+        return msg
+
     def info(self, msg: str, *args, data: dict | None = None, **kwargs):
         """Log info with optional structured data."""
+        msg = self._validate_message(msg)
         if data:
             kwargs["data"] = data
         super().info(msg, *args, **kwargs)
 
     def warning(self, msg: str, *args, data: dict | None = None, **kwargs):
         """Log warning with optional structured data."""
+        msg = self._validate_message(msg)
         if data:
             kwargs["data"] = data
         super().warning(msg, *args, **kwargs)
 
     def error(self, msg: str, *args, data: dict | None = None, **kwargs):
         """Log error with optional structured data."""
+        msg = self._validate_message(msg)
         if data:
             kwargs["data"] = data
         super().error(msg, *args, **kwargs)
 
     def debug(self, msg: str, *args, data: dict | None = None, **kwargs):
         """Log debug with optional structured data."""
+        msg = self._validate_message(msg)
         if data:
             kwargs["data"] = data
         super().debug(msg, *args, **kwargs)
