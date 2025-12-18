@@ -13,10 +13,10 @@ venv/
 
 # Cache and data (NEVER commit user data!)
 # Production uses DATA_DIR env var to separate code from data
-cache/
-data/
+# IMPORTANT: Exclude only root-level cache/, not app/core/cache/ (source code)
+/cache/
 /data/
-downloads/
+/downloads/
 *.log
 *.db
 *.db-journal
