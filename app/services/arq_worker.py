@@ -26,11 +26,13 @@ setup_logging(
     enable_yc_logging=False,  # YC logging via fluent-bit
 )
 
-# Configure ARQ framework loggers explicitly
+# Configure ARQ framework loggers to use JSON format
 for arq_logger_name in ["arq.worker", "arq.jobs", "arq"]:
     arq_logger = logging.getLogger(arq_logger_name)
     arq_logger.setLevel(logging.INFO)
-    # ARQ loggers will inherit root logger's handlers (JSON format)
+    arq_logger.propagate = True  # Use root logger's handlers (JSON format)
+    # Prevent ARQ from adding its own handlers that output to stderr
+    arq_logger.handlers.clear()
 
 logger = get_logger(__name__)
 
