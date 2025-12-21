@@ -13,6 +13,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import time
 
 from .track_analysis import TrackAnalysisPipeline, TrackAnalysisResult
+from app.common.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # Set environment variables for M2 optimization
@@ -158,7 +161,7 @@ class M2BatchProcessor:
 
                 if show_progress:
                     status = "OK" if result.success else "FAIL"
-                    print(f"[{done}/{total}] {result.file_name}: {result.zone} ({status})")
+                    logger.info("Track processed", data={"done": done, "total": total, "file": result.file_name, "zone": result.zone, "status": status})
 
             # Memory cleanup between chunks
             gc.collect()
@@ -218,7 +221,7 @@ class M2BatchProcessor:
                     paths.extend(dir_path.glob(ext))
 
         paths = [str(p) for p in paths]
-        print(f"Found {len(paths)} audio files in {directory}")
+        logger.info("Audio files discovered", data={"count": len(paths), "directory": directory})
 
         return self.process_files(paths, on_progress=on_progress)
 

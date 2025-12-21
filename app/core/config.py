@@ -8,6 +8,10 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from app.common.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def get_data_dir() -> Path:
     """
@@ -61,6 +65,8 @@ def init_config():
     CACHE_DIR = get_cache_dir()
     DB_PATH = get_db_path()
 
-    print(f"[Config] DATA_DIR: {DATA_DIR}")
-    print(f"[Config] CACHE_DIR: {CACHE_DIR}")
-    print(f"[Config] DB_PATH: {DB_PATH}")
+    logger.info("Configuration initialized", data={
+        "data_dir": str(DATA_DIR),
+        "cache_dir": str(CACHE_DIR),
+        "db_path": str(DB_PATH)
+    })

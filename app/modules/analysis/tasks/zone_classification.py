@@ -16,6 +16,9 @@ from pathlib import Path
 
 from .base import AudioContext, TaskResult, BaseTask
 from .feature_extraction import FeatureExtractionTask, FEATURE_NAMES
+from app.common.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 ZONE_YELLOW = 'yellow'
@@ -138,7 +141,7 @@ class ZoneClassificationTask(BaseTask):
                 else:
                     self.model = data
         except Exception as e:
-            print(f"Warning: Could not load model: {e}")
+            logger.warning("Could not load model", data={"error": str(e)})
 
     def execute(self, context: AudioContext) -> ZoneClassificationResult:
         """Classify the track into an energy zone."""
@@ -162,7 +165,7 @@ class ZoneClassificationTask(BaseTask):
                 except Exception as e:
                     if not self.use_rules_fallback:
                         raise
-                    print(f"ML classification failed, using rules: {e}")
+                    logger.warning("ML classification failed, using rules", data={"error": str(e)})
 
             # Rule-based classification
             result = self._classify_rules(features)

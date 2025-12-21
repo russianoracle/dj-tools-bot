@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import time
 
 from .base import AudioContext, TaskResult, BaseTask
+from app.common.logging import get_logger
 from app.common.primitives import (
     # NOTE: compute_rms, compute_centroid, compute_rolloff are BLOCKED
     # Use context.stft_cache.get_rms(), get_spectral_centroid(), get_spectral_rolloff() instead
@@ -34,6 +35,8 @@ from app.common.primitives import (
     compute_filter_position,
     detect_filter_sweeps,
 )
+
+logger = get_logger(__name__)
 
 
 class TransitionType(Enum):
@@ -1087,14 +1090,14 @@ class TransitionDetectionTask(BaseTask):
                     filtered.append(mixin)
 
             if self.verbose and drop_filtered_count > 0:
-                print(f"  Drop filter: removed {drop_filtered_count}/{len(mixins)} candidates")
+                logger.debug("Drop filter applied", data={"removed": drop_filtered_count, "total": len(mixins)})
 
             return filtered
 
         except Exception as e:
             # Graceful degradation: if drop detection fails, don't break transition detection
             if self.verbose:
-                print(f"  Drop filter failed: {e}, keeping all mixins")
+                logger.warning("Drop filter failed, keeping all mixins", data={"error": str(e)})
             return mixins
 
     def _filter_by_segmentation_context(
@@ -1161,14 +1164,14 @@ class TransitionDetectionTask(BaseTask):
                     segment_penalty_count += 1
 
             if self.verbose:
-                print(f"  Segmentation filter: {segment_boost_count} boosted, {segment_penalty_count} penalized")
+                logger.debug("Segmentation filter applied", data={"boosted": segment_boost_count, "penalized": segment_penalty_count})
 
             return mixins
 
         except Exception as e:
             # Graceful degradation: if segmentation fails, don't break transition detection
             if self.verbose:
-                print(f"  Segmentation filter failed: {e}, keeping all mixins")
+                logger.warning("Segmentation filter failed, keeping all mixins", data={"error": str(e)})
             return mixins
 
     def _apply_drop_filter_from_cache(self, mixins: List[MixinEvent], drops: List) -> List[MixinEvent]:
@@ -1303,7 +1306,7 @@ class TransitionDetectionTask(BaseTask):
                 drop_result = drop_task.execute(context)
                 result['drops'] = drop_result.drops if drop_result.success else []
             except Exception as e:
-                print(f"WARNING: DropDetection failed in compute_raw_features: {e}", flush=True)
+                logger.warning("DropDetection failed in compute_raw_features", data={"error": str(e)})
                 result['drops'] = []
 
             try:
@@ -1317,7 +1320,7 @@ class TransitionDetectionTask(BaseTask):
                 seg_result = seg_task.execute(context)
                 result['seg_boundaries'] = seg_result.boundaries if seg_result.success else []
             except Exception as e:
-                print(f"WARNING: Segmentation failed in compute_raw_features: {e}", flush=True)
+                logger.warning("Segmentation failed in compute_raw_features", data={"error": str(e)})
                 result['seg_boundaries'] = []
 
         return result

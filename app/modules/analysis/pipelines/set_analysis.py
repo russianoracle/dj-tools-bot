@@ -763,7 +763,7 @@ class SetAnalysisPipeline(Pipeline):
             if drops:
                 details = f" ({drops.n_drops} drops)"
 
-        print(f"    [{elapsed:.1f}s] {description}{details}")
+        logger.info("Stage completed", data={"elapsed_sec": f"{elapsed:.1f}", "description": description, "details": details})
 
     def analyze(self, path: str) -> SetAnalysisResult:
         """
@@ -836,7 +836,7 @@ class SetBatchAnalyzer:
 
         # Проверить статус
         status = analyzer.get_status(set_paths)
-        print(f"Cached: {status['cached']}, Pending: {status['pending']}")
+        logger.info("Set analysis status", data={"cached": status['cached'], "pending": status['pending']})
 
         # Запустить анализ (с автоматическим checkpoint)
         results = analyzer.analyze_sets(set_paths, analyze_genres=True)
@@ -916,7 +916,7 @@ class SetBatchAnalyzer:
             result = self._result_from_dict(cache_hits[idx])
             results[idx] = result
             if show_progress:
-                print(f"[{idx + 1}/{total}] {Path(set_paths[idx]).name}: cached")
+                logger.info("Set loaded from cache", data={"index": idx + 1, "total": total, "name": Path(set_paths[idx]).name})
             if on_progress:
                 on_progress(idx + 1, total, set_paths[idx], result)
 
@@ -935,7 +935,7 @@ class SetBatchAnalyzer:
             i = idx + 1
 
             if show_progress:
-                print(f"[{i}/{total}] Analyzing: {Path(path).name}")
+                logger.info("Analyzing set", data={"index": i, "total": total, "name": Path(path).name})
 
             try:
                 result = pipeline.analyze(abs_path)
@@ -945,7 +945,7 @@ class SetBatchAnalyzer:
 
                 if show_progress:
                     status = "OK" if result.success else "FAIL"
-                    print(f"  -> {result.n_segments} segments, {result.total_drops} drops ({status})")
+                    logger.info("Set analysis completed", data={"segments": result.n_segments, "drops": result.total_drops, "status": status})
 
             except Exception as e:
                 result = SetAnalysisResult(
@@ -963,7 +963,7 @@ class SetBatchAnalyzer:
                     error=str(e)
                 )
                 if show_progress:
-                    print(f"  -> ERROR: {e}")
+                    logger.error("Set analysis failed", data={"error": str(e)})
 
             results[idx] = result
 
@@ -974,7 +974,7 @@ class SetBatchAnalyzer:
 
         if show_progress:
             new_count = len(pending_indices)
-            print(f"\nDone: {total} sets ({cached_count} from cache, {new_count} analyzed)")
+            logger.info("Batch analysis completed", data={"total": total, "cached": cached_count, "analyzed": new_count})
 
         return results
 

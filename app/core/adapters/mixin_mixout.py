@@ -37,6 +37,9 @@ from .analysis_utils import (
 )
 # Import centralized STFTCache from common primitives
 from app.common.primitives.stft import STFTCache
+from app.common.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Additional scipy imports
 from scipy.ndimage import uniform_filter1d, gaussian_filter1d
@@ -289,7 +292,7 @@ class M2MixinMixoutDetector:
         Returns:
             TransitionAnalysis with all detected events
         """
-        print(f"Loading: {audio_path}")
+        logger.info("Loading audio file", data={"path": str(audio_path)})
 
         # Load audio using centralized loader
         from .loader import AudioLoader
@@ -297,7 +300,7 @@ class M2MixinMixoutDetector:
         y, sr = loader.load(str(audio_path))
         duration = len(y) / sr
 
-        print(f"Duration: {duration/60:.1f} min")
+        logger.info("Audio loaded", data={"duration_min": f"{duration/60:.1f}"})
 
         # Run analysis
         return self._analyze_audio(y, sr, audio_path)
@@ -322,7 +325,7 @@ class M2MixinMixoutDetector:
         # PHASE 1: Core computations (compute ONCE via STFTCache)
         # ============================================================
 
-        print("  Computing STFT...")
+        logger.debug("Computing STFT")
 
         # Use centralized STFTCache for all spectral features
         from app.common.primitives.stft import compute_stft
@@ -344,7 +347,7 @@ class M2MixinMixoutDetector:
         # PHASE 2: Energy analysis (vectorized)
         # ============================================================
 
-        print("  Analyzing energy...")
+        logger.debug("Analyzing energy")
 
         # RMS energy (from STFTCache)
         rms = stft_cache.get_rms()
@@ -362,7 +365,7 @@ class M2MixinMixoutDetector:
         # PHASE 3: Frequency band analysis (vectorized)
         # ============================================================
 
-        print("  Analyzing frequency bands...")
+        logger.debug("Analyzing frequency bands")
 
         # Sub-bass (20-60 Hz) - kick drum fundamental
         sub_bass = self._band_energy(S_power, 20, 60)
@@ -390,7 +393,7 @@ class M2MixinMixoutDetector:
         # PHASE 4: Spectral analysis (for filter detection)
         # ============================================================
 
-        print("  Analyzing spectral features...")
+        logger.debug("Analyzing spectral features")
 
         # Spectral centroid (from STFTCache)
         centroid = stft_cache.get_spectral_centroid()
@@ -419,7 +422,7 @@ class M2MixinMixoutDetector:
         # PHASE 5: Onset/rhythm analysis
         # ============================================================
 
-        print("  Analyzing rhythm...")
+        logger.debug("Analyzing rhythm")
 
         # Onset strength (from STFTCache)
         onset_env = stft_cache.get_onset_strength()[:n_frames]
@@ -433,7 +436,7 @@ class M2MixinMixoutDetector:
         # PHASE 6: Detect transition candidates
         # ============================================================
 
-        print("  Detecting transitions...")
+        logger.debug("Detecting transitions")
 
         # Combined novelty function for transition detection
         novelty = self._compute_novelty(
@@ -453,7 +456,7 @@ class M2MixinMixoutDetector:
         # PHASE 7: Classify and refine transitions
         # ============================================================
 
-        print("  Classifying transitions...")
+        logger.debug("Classifying transitions")
 
         mixins = []
         mixouts = []
@@ -533,7 +536,7 @@ class M2MixinMixoutDetector:
             t_name = e.transition_type.name
             type_dist[t_name] = type_dist.get(t_name, 0) + 1
 
-        print(f"  Found {len(mixins)} mixins, {len(mixouts)} mixouts")
+        logger.info("Transitions detected", data={"mixins": len(mixins), "mixouts": len(mixouts)})
 
         return TransitionAnalysis(
             file_path=file_path,
