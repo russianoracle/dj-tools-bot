@@ -132,6 +132,7 @@ services:
       - ./parsers.conf:/fluent-bit/etc/parsers.conf:ro
       - ./set-source.lua:/fluent-bit/etc/set-source.lua:ro
       - ./detect-level.lua:/fluent-bit/etc/detect-level.lua:ro
+      - ./flatten-log.lua:/fluent-bit/etc/flatten-log.lua:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
