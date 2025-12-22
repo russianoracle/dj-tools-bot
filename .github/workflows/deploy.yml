@@ -276,11 +276,10 @@ jobs:
           # Pull new image (YC registry only, no Docker Hub fallback)
           docker pull ${{ env.REGISTRY }}/${{ env.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
-          # Stop services in production directory
+          # Go to production directory
           cd /home/ubuntu/app
-          docker-compose down || true
 
-          # Copy configuration files from checkout to production
+          # Copy configuration files from checkout to production BEFORE stopping containers
           echo "Copying configuration files from $CHECKOUT_DIR to /home/ubuntu/app/..."
           cp "$CHECKOUT_DIR/docker-compose.yml" /home/ubuntu/app/ && echo "✅ docker-compose.yml" || echo "❌ ERROR: docker-compose.yml not found!"
           cp "$CHECKOUT_DIR/fluent-bit.conf" /home/ubuntu/app/ 2>/dev/null && echo "✅ fluent-bit.conf" || echo "⚠️  fluent-bit.conf not found"
@@ -290,8 +289,13 @@ jobs:
           cp "$CHECKOUT_DIR/healthcheck_worker.py" /home/ubuntu/app/ 2>/dev/null && echo "✅ healthcheck_worker.py" || echo "⚠️  healthcheck_worker.py not found"
           cp "$CHECKOUT_DIR/logging-config.yaml" /home/ubuntu/app/ 2>/dev/null && echo "✅ logging-config.yaml" || echo "⚠️  logging-config.yaml not found"
 
-          # Start all services with docker-compose
-          docker-compose up -d
+          # Stop and REMOVE containers to force recreate with new config
+          echo "Stopping and removing containers to apply new configuration..."
+          docker-compose down --remove-orphans || true
+
+          # Start all services with docker-compose (--force-recreate ensures new config is applied)
+          echo "Starting containers with new configuration..."
+          docker-compose up -d --force-recreate
 
           # Verify containers are running
           sleep 10

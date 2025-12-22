@@ -372,13 +372,13 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
             "memory_delta_mb": round(mem_delta_mb, 1),
         })
 
-        # Keep file for caching (don't delete) - cleanup happens via cache size limits
-        # if os.path.exists(file_path):
-        #     os.remove(file_path)
-        logger.debug("File kept for cache", data={
-            "job_id": job_id,
-            "file_path": file_path,
-        })
+        # Cleanup temp file after successful analysis
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.debug("Cleaned up temp file", data={
+                "job_id": job_id,
+                "file_path": file_path,
+            })
 
         # Store result
         _job_results[job_id] = {
@@ -415,13 +415,20 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
             "error": str(e),
         }, exc_info=True)
 
-        # Keep file even on error (for debugging and potential retry)
-        # Cleanup happens via cache size limits
+        # Cleanup on error
         if os.path.exists(file_path):
-            logger.debug("File kept after error", data={
-                "job_id": job_id,
-                "file_path": file_path,
-            })
+            try:
+                os.remove(file_path)
+                logger.debug("Cleaned up temp file after error", data={
+                    "job_id": job_id,
+                    "file_path": file_path,
+                })
+            except Exception as cleanup_error:
+                logger.warning("Failed to cleanup temp file", data={
+                    "job_id": job_id,
+                    "file_path": file_path,
+                    "error": str(cleanup_error),
+                })
 
         _job_results[job_id] = {
             "state": "FAILURE",
@@ -469,26 +476,37 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
         "job_id": job_id,
         "user_id": user_id,
         "url": url[:100],
+        "url_hash": url_hash,
     })
 
     # Start timing
     _job_start_times[job_id] = time.time()
 
-    update_job_progress(job_id, 5, "📥 Downloading audio...")
-
     try:
-        # Download audio via NAT Gateway
-        download_audio(url, output_template)
-
-        # Find downloaded file
+        # Check if file already exists (cached from previous download)
         file_path = None
         for f in os.listdir(downloads_dir):
             if f.startswith(url_hash):
                 file_path = os.path.join(downloads_dir, f)
+                logger.info("File already cached, skipping download", data={
+                    "job_id": job_id,
+                    "file_path": file_path,
+                })
                 break
 
+        # Download only if not cached
         if not file_path:
-            raise Exception("Downloaded file not found")
+            update_job_progress(job_id, 5, "📥 Downloading audio...")
+            download_audio(url, output_template)
+
+            # Find downloaded file
+            for f in os.listdir(downloads_dir):
+                if f.startswith(url_hash):
+                    file_path = os.path.join(downloads_dir, f)
+                    break
+
+            if not file_path:
+                raise Exception("Downloaded file not found")
 
         download_time = time.time() - _job_start_times[job_id]
         logger.info("Download completed", data={
