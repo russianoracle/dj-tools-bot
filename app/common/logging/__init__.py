@@ -2,6 +2,7 @@
 
 from .config import Config, get_config
 from .logger import setup_logger, setup_logging, get_logger
+from .logging_config import LoggingConfig, get_logging_config
 from .formatters import JSONFormatter, StructuredLogAdapter
 from .correlation import (
     CorrelationMiddleware,
@@ -42,6 +43,9 @@ __all__ = [
     'setup_logger',
     'setup_logging',
     'get_logger',
+    # Logging config
+    'LoggingConfig',
+    'get_logging_config',
     # Structured logging
     'JSONFormatter',
     'StructuredLogAdapter',

@@ -29,11 +29,12 @@ init_secrets(
 from app.common.logging import setup_logging, get_logger
 
 setup_logging(
-    level=os.getenv("LOG_LEVEL", "INFO"),
+    level=os.getenv("LOG_LEVEL"),  # Uses centralized config if not set
     log_file=os.getenv("LOG_FILE"),
-    json_format=os.getenv("LOG_JSON_FORMAT", "true").lower() == "true",
+    json_format=None if "LOG_JSON_FORMAT" not in os.environ else os.getenv("LOG_JSON_FORMAT").lower() == "true",
     enable_yc_logging=True,
     yc_resource_type="bot",
+    component="bot",
 )
 
 logger = get_logger(__name__)

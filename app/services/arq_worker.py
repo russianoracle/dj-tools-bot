@@ -38,9 +38,10 @@ signal.signal(signal.SIGINT, signal_handler)
 
 # Configure JSON logging for ARQ worker and framework
 setup_logging(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    json_format=bool(os.getenv("LOG_JSON_FORMAT", "true").lower() in ("true", "1", "yes")),
+    level=os.getenv("LOG_LEVEL"),  # None = use centralized config
+    json_format=bool(os.getenv("LOG_JSON_FORMAT", "true").lower() in ("true", "1", "yes")) if os.getenv("LOG_JSON_FORMAT") else None,
     enable_yc_logging=False,  # YC logging via fluent-bit
+    component="worker",  # Use worker-specific logging config
 )
 
 # Configure ARQ framework loggers to use JSON format

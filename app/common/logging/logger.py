@@ -9,6 +9,7 @@ from typing import Optional
 
 from .formatters import JSONFormatter, StructuredLogAdapter
 from .correlation import CorrelationLogFilter
+from .logging_config import get_logging_config
 
 
 # Global flag to track if logging is configured
@@ -16,33 +17,46 @@ _logging_configured = False
 
 
 def setup_logging(
-    level: str = "INFO",
+    level: Optional[str] = None,
     log_file: Optional[str] = None,
-    json_format: bool = True,
+    json_format: Optional[bool] = None,
     enable_yc_logging: bool = True,
     yc_log_group_id: Optional[str] = None,
     yc_folder_id: Optional[str] = None,
     yc_resource_type: str = "bot",
     max_bytes: int = 10 * 1024 * 1024,
     backup_count: int = 3,
+    component: str = "default",
 ) -> None:
     """
     Configure application-wide logging with optional YC Cloud Logging.
 
+    Uses centralized logging-config.yaml for component-specific configuration.
+
     Args:
-        level: Logging level (DEBUG, INFO, WARNING, ERROR)
+        level: Logging level (DEBUG, INFO, WARNING, ERROR). If None, uses centralized config
         log_file: Path to local log file (optional)
-        json_format: Use JSON formatter for structured logs
+        json_format: Use JSON formatter for structured logs. If None, uses centralized config
         enable_yc_logging: Enable Yandex Cloud Logging handler
         yc_log_group_id: YC Log Group ID
         yc_folder_id: YC Folder ID (alternative to log_group_id)
         yc_resource_type: Resource type label for YC logs
         max_bytes: Max file size before rotation
         backup_count: Number of backup files
+        component: Component name for centralized config (bot, worker, fluent-bit, etc)
     """
     global _logging_configured
     if _logging_configured:
         return
+
+    # Get centralized logging config
+    log_config = get_logging_config()
+
+    # Use centralized config if not explicitly provided
+    if level is None:
+        level = log_config.get_level(component)
+    if json_format is None:
+        json_format = log_config.get_json_format(component)
 
     # Get root logger
     root_logger = logging.getLogger()
