@@ -390,9 +390,9 @@ jobs:
     needs: [cleanup, cleanup-docker-images, cleanup-logs, cleanup-downloads]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Cleanup old images in registry (keep last 5)
+      - name: Cleanup old images in registry (keep last 3)
         run: |
-          echo "Cleaning old images from registry (keeping last 5)"
+          echo "Cleaning old images from registry (keeping last 3)"
 
           # Check if yc is available
           if ! command -v yc &> /dev/null; then
@@ -400,14 +400,32 @@ jobs:
             exit 0
           fi
 
+          # Step 1: Delete all untagged images immediately
+          echo "Deleting untagged images..."
           yc container image list \
             --registry-id ${{ env.REGISTRY_ID }} \
             --format json 2>/dev/null | \
-          jq -r '.[] | select(.tags | length == 0 or (.[0] | contains("latest") | not)) | .id' | \
-          tail -n +6 | \
+          jq -r '.[] | select(.tags | length == 0) | .id' | \
           while read image_id; do
             if [ -n "$image_id" ]; then
-              echo "Deleting image: $image_id"
+              echo "Deleting untagged image: $image_id"
+              yc container image delete --id "$image_id" 2>/dev/null || true
+            fi
+          done
+
+          # Step 2: Keep only last 3 SHA-tagged images (sort by date, newest first)
+          echo "Cleaning old SHA-tagged images (keeping last 3)..."
+          yc container image list \
+            --registry-id ${{ env.REGISTRY_ID }} \
+            --format json 2>/dev/null | \
+          jq -r '.[] | select(.tags | length > 0 and (.[0] | contains("latest") | not)) |
+                 "\(.created_at) \(.id)"' | \
+          sort -r | \
+          awk '{print $2}' | \
+          tail -n +4 | \
+          while read image_id; do
+            if [ -n "$image_id" ]; then
+              echo "Deleting old image: $image_id"
               yc container image delete --id "$image_id" 2>/dev/null || true
             fi
           done

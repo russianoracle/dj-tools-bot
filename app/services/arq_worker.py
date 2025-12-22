@@ -9,6 +9,8 @@ import os
 import time
 import logging
 import subprocess
+import signal
+import psutil
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -18,6 +20,21 @@ from arq.connections import RedisSettings, ArqRedis
 from app.common.logging import get_logger, setup_logging
 from app.common.logging.correlation import set_job_id, set_user_id
 from app.common.monitoring import get_metrics_collector
+
+# Graceful shutdown flag
+_shutdown_requested = False
+
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    global _shutdown_requested
+    _shutdown_requested = True
+    logger.warning("Shutdown signal received", data={"signal": signum})
+
+
+# Register shutdown handlers
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 # Configure JSON logging for ARQ worker and framework
 setup_logging(
@@ -268,10 +285,15 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
     set_job_id(job_id)
     set_user_id(user_id)
 
+    # Log initial memory
+    process = psutil.Process()
+    initial_mem_mb = process.memory_info().rss / 1024 / 1024
+
     logger.info("Starting set analysis", data={
         "job_id": job_id,
         "user_id": user_id,
         "file_path": file_path,
+        "initial_memory_mb": round(initial_mem_mb, 1),
     })
 
     # Start timing
@@ -324,6 +346,10 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
 
         elapsed = time.time() - _job_start_times.get(job_id, time.time())
 
+        # Log final memory usage
+        final_mem_mb = process.memory_info().rss / 1024 / 1024
+        mem_delta_mb = final_mem_mb - initial_mem_mb
+
         # Collect metrics
         metrics = get_metrics_collector()
         metrics.record_task_metrics(
@@ -341,6 +367,8 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
             "n_segments": result.n_segments,
             "total_drops": result.total_drops,
             "success": result.success,
+            "final_memory_mb": round(final_mem_mb, 1),
+            "memory_delta_mb": round(mem_delta_mb, 1),
         })
 
         # Cleanup file
@@ -601,12 +629,15 @@ class WorkerSettings:
     max_jobs = 2
 
     # Long timeouts for 2+ hour DJ sets
-    job_timeout = 3600          # 1 hour max per job
+    job_timeout = 7200          # 2 hours max per job (increased from 1h)
     keep_result = 7200          # Keep results for 2 hours
 
     # Health check settings - don't mark jobs as failed during long operations
     health_check_interval = 300  # 5 minutes between health checks
     max_tries = 1                # Don't retry failed jobs automatically
+
+    # Graceful shutdown - allow jobs to finish
+    allow_abort_jobs = False
 
 
 # Redis pool for enqueueing jobs
