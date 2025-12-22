@@ -278,11 +278,15 @@ jobs:
           # Stop all services
           docker-compose down || true
 
-          # Copy fluent-bit configuration files
-          echo "Copying fluent-bit configuration files..."
+          # Copy configuration files to production VM
+          echo "Copying configuration files..."
+          cp docker-compose.yml /home/ubuntu/app/ || echo "ERROR: docker-compose.yml not found!"
           cp fluent-bit.conf /home/ubuntu/app/ 2>/dev/null || echo "fluent-bit.conf not found"
           cp parsers.conf /home/ubuntu/app/ 2>/dev/null || echo "parsers.conf not found"
           cp set-source.lua /home/ubuntu/app/ 2>/dev/null || echo "set-source.lua not found"
+          cp flatten-log.lua /home/ubuntu/app/ 2>/dev/null || echo "flatten-log.lua not found"
+          cp healthcheck_worker.py /home/ubuntu/app/ 2>/dev/null || echo "healthcheck_worker.py not found"
+          cp logging-config.yaml /home/ubuntu/app/ 2>/dev/null || echo "logging-config.yaml not found"
 
           # Start all services with docker-compose
           docker-compose up -d
