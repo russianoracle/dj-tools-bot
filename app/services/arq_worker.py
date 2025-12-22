@@ -372,13 +372,13 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
             "memory_delta_mb": round(mem_delta_mb, 1),
         })
 
-        # Cleanup file
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            logger.debug("Cleaned up temp file", data={
-                "job_id": job_id,
-                "file_path": file_path,
-            })
+        # Keep file for caching (don't delete) - cleanup happens via cache size limits
+        # if os.path.exists(file_path):
+        #     os.remove(file_path)
+        logger.debug("File kept for cache", data={
+            "job_id": job_id,
+            "file_path": file_path,
+        })
 
         # Store result
         _job_results[job_id] = {
@@ -415,16 +415,13 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
             "error": str(e),
         }, exc_info=True)
 
-        # Cleanup on error
+        # Keep file even on error (for debugging and potential retry)
+        # Cleanup happens via cache size limits
         if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception as cleanup_error:
-                logger.warning("Failed to cleanup temp file", data={
-                    "job_id": job_id,
-                    "file_path": file_path,
-                    "error": str(cleanup_error),
-                })
+            logger.debug("File kept after error", data={
+                "job_id": job_id,
+                "file_path": file_path,
+            })
 
         _job_results[job_id] = {
             "state": "FAILURE",
@@ -453,7 +450,7 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
     Returns:
         Analysis result dict
     """
-    import uuid
+    import hashlib
 
     job_id = ctx.get("job_id", "unknown")
 
@@ -464,8 +461,9 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
     downloads_dir = os.getenv("DOWNLOADS_DIR", "/tmp/downloads")
     os.makedirs(downloads_dir, exist_ok=True)
 
-    file_id = str(uuid.uuid4())[:8]
-    output_template = os.path.join(downloads_dir, f"{file_id}.%(ext)s")
+    # Use URL hash for consistent file naming (enables caching for same URL)
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
+    output_template = os.path.join(downloads_dir, f"{url_hash}.%(ext)s")
 
     logger.info("Starting download and analysis", data={
         "job_id": job_id,
@@ -485,7 +483,7 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
         # Find downloaded file
         file_path = None
         for f in os.listdir(downloads_dir):
-            if f.startswith(file_id):
+            if f.startswith(url_hash):
                 file_path = os.path.join(downloads_dir, f)
                 break
 
