@@ -657,10 +657,29 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
 
 
 # ARQ Worker class
+async def startup(ctx):
+    """Worker startup hook - initialize metrics server."""
+    from app.core.monitoring.server import start_metrics_server
+    from app.core.monitoring import set_app_info
+    import sys
+
+    # Start Prometheus metrics server
+    start_metrics_server()
+    set_app_info(
+        version="1.0.0",
+        environment=os.getenv("ENV", "production"),
+        python_version=f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
+    logger.info("Worker metrics server started")
+
+
 class WorkerSettings:
     """ARQ Worker settings for long-running DJ set analysis."""
     functions = [analyze_set_task, download_and_analyze_task]
     redis_settings = get_redis_settings()
+
+    # Worker startup hook
+    on_startup = startup
 
     # Allow 2 concurrent jobs
     max_jobs = 2

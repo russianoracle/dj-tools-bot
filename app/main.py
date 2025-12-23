@@ -44,6 +44,19 @@ async def main():
     """Main entry point."""
     logger.info("Starting DJ Tools Bot...")
 
+    # Start metrics server (Prometheus endpoint)
+    from app.core.monitoring.server import start_metrics_server
+    from app.core.monitoring import set_app_info
+    import sys
+
+    start_metrics_server()
+    set_app_info(
+        version="1.0.0",
+        environment=os.getenv("ENV", "production"),
+        python_version=f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
+    logger.info("Metrics server started")
+
     from app.modules.bot.routers.main import start_bot
     await start_bot()
 

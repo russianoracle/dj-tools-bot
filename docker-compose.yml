@@ -35,6 +35,12 @@ services:
       - YC_LOCKBOX_SECRET_ID=${YC_LOCKBOX_SECRET_ID:-}
       - YC_FOLDER_ID=${YC_FOLDER_ID:-}
       - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
+      # Monitoring
+      - METRICS_PORT=8000
+      - METRICS_UPDATE_INTERVAL=10
+      - PROCESS_NAME=bot
+    ports:
+      - "8000:8000"  # Prometheus metrics endpoint
     volumes:
       # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
       - mood_data:/data
@@ -77,6 +83,12 @@ services:
       - YC_LOCKBOX_SECRET_ID=${YC_LOCKBOX_SECRET_ID:-}
       - YC_FOLDER_ID=${YC_FOLDER_ID:-}
       - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
+      # Monitoring
+      - METRICS_PORT=8001
+      - METRICS_UPDATE_INTERVAL=10
+      - PROCESS_NAME=worker
+    ports:
+      - "8001:8001"  # Prometheus metrics endpoint
     volumes:
       # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
       - mood_data:/data
