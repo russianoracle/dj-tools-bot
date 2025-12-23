@@ -1,7 +1,7 @@
 # DJ Tools Bot - Local Development Commands
 # Updated with new deployment system (sync to dj-tools-bot)
 
-.PHONY: start stop logs clean test deploy deploy-full
+.PHONY: install install-dev start-local restart-local stop-local status-local logs-worker logs-all start stop logs clean test deploy deploy-full
 
 # ============================================================================
 # HELP
@@ -12,7 +12,17 @@
 help:
 	@echo "📚 DJ Tools Bot - Available Commands"
 	@echo ""
-	@echo "🚀 Development:"
+	@echo "⚙️  Setup:"
+	@echo "  make install          - Install dependencies"
+	@echo "  make install-dev      - Install dev dependencies"
+	@echo ""
+	@echo "🚀 Local Development:"
+	@echo "  make start-local      - Start Redis + Bot + Worker locally"
+	@echo "  make restart-local    - Restart all local services"
+	@echo "  make stop-local       - Stop all local services + cleanup"
+	@echo "  make status-local     - Check local services status"
+	@echo ""
+	@echo "🚀 Development (Legacy):"
 	@echo "  make start        - Start full stack (Redis + Bot)"
 	@echo "  make start-bot    - Start bot only"
 	@echo "  make dev          - Development mode (interactive logs)"
@@ -52,6 +62,108 @@ PYTHON := /Applications/miniforge3/bin/python3
 
 # GitHub CLI executable
 GH_BIN := /opt/homebrew/bin/gh
+
+# ============================================================================
+# SETUP & INSTALLATION
+# ============================================================================
+
+# Install production dependencies
+install:
+	@echo "📦 Installing production dependencies..."
+	@$(PYTHON) -m pip install -r requirements-prod-app.txt
+	@echo "✅ Dependencies installed"
+
+# Install dev dependencies
+install-dev:
+	@echo "📦 Installing dev dependencies..."
+	@$(PYTHON) -m pip install -r requirements.txt
+	@$(PYTHON) -m pip install -r requirements-dev.txt
+	@echo "✅ Dev dependencies installed"
+
+# ============================================================================
+# LOCAL DEVELOPMENT (Bot + Worker)
+# ============================================================================
+
+# Start Redis + Bot + Worker locally
+start-local:
+	@echo "🚀 Starting local development environment..."
+	@echo ""
+	@echo "📦 Step 1/3: Starting Redis..."
+	@redis-server --daemonize yes --port 6379 --dir ./cache --dbfilename dump.rdb
+	@sleep 1
+	@redis-cli ping > /dev/null && echo "  ✅ Redis started" || echo "  ❌ Redis failed to start"
+	@echo ""
+	@echo "🤖 Step 2/3: Starting Telegram Bot..."
+	@REDIS_HOST=localhost REDIS_PORT=6379 DATA_DIR=./cache nohup $(PYTHON) -m app.main > bot.log 2>&1 &
+	@echo "  ✅ Bot started (PID: $$!)"
+	@sleep 2
+	@echo ""
+	@echo "⚙️  Step 3/3: Starting ARQ Worker..."
+	@REDIS_HOST=localhost REDIS_PORT=6379 DATA_DIR=./cache nohup $(PYTHON) -m arq app.services.arq_worker.WorkerSettings > worker.log 2>&1 &
+	@echo "  ✅ Worker started (PID: $$!)"
+	@sleep 2
+	@echo ""
+	@echo "✅ All services started!"
+	@echo ""
+	@echo "📊 Status:"
+	@$(MAKE) status-local
+	@echo ""
+	@echo "📄 Logs:"
+	@echo "  Bot:    tail -f bot.log"
+	@echo "  Worker: tail -f worker.log"
+
+# Check local services status
+status-local:
+	@echo "📊 Local Services Status:"
+	@echo ""
+	@echo "Redis:"
+	@redis-cli ping 2>/dev/null && echo "  ✅ Running" || echo "  ❌ Not running"
+	@echo ""
+	@echo "Bot:"
+	@pgrep -f "python.*app.main" >/dev/null && echo "  ✅ Running (PID: $$(pgrep -f 'python.*app.main'))" || echo "  ❌ Not running"
+	@echo ""
+	@echo "Worker:"
+	@pgrep -f "arq.*WorkerSettings" >/dev/null && echo "  ✅ Running (PID: $$(pgrep -f 'arq.*WorkerSettings'))" || echo "  ❌ Not running"
+
+# Restart all local services
+restart-local:
+	@echo "🔄 Restarting local services..."
+	@$(MAKE) stop-local
+	@sleep 2
+	@$(MAKE) start-local
+
+# Stop all local services + cleanup
+stop-local:
+	@echo "🛑 Stopping local services..."
+	@echo ""
+	@echo "Stopping Bot..."
+	@pkill -f "python.*app.main" || echo "  (not running)"
+	@echo "Stopping Worker..."
+	@pkill -f "arq.*WorkerSettings" || echo "  (not running)"
+	@echo "Stopping Redis..."
+	@redis-cli shutdown 2>/dev/null || echo "  (not running)"
+	@echo ""
+	@echo "🧹 Cleaning up..."
+	@rm -f bot.log worker.log nohup.out
+	@rm -f cache/dump.rdb
+	@echo ""
+	@echo "✅ All services stopped and cleaned"
+
+# View worker logs
+logs-worker:
+	@tail -f worker.log
+
+# View both logs
+logs-all:
+	@echo "📋 Bot logs (bot.log):"
+	@tail -20 bot.log
+	@echo ""
+	@echo "📋 Worker logs (worker.log):"
+	@tail -20 worker.log
+
+# ============================================================================
+# LEGACY COMMANDS (for backward compatibility)
+# ============================================================================
 
 # Start full stack (Redis + Bot)
 start:
@@ -171,6 +283,9 @@ sync-to-deploy:
 	@cp requirements-prod.txt requirements-prod-app.txt $(DEPLOY_REPO)/ || true
 	@cp .dockerignore .env.example .gitleaksignore README.md $(DEPLOY_REPO)/ || true
 	@cp Makefile $(DEPLOY_REPO)/ || true
+	@echo "  → Copying scripts/"
+	@mkdir -p $(DEPLOY_REPO)/scripts
+	@cp scripts/fetch-secrets.sh $(DEPLOY_REPO)/scripts/ || true
 	@echo "✅ Files synced to $(DEPLOY_REPO)"
 
 # Cancel running GitHub Actions workflows before deploy
@@ -249,27 +364,27 @@ deploy-safe: backup-db deploy-full
 # ============================================================================
 
 # Show production container logs
-logs:
+logs-prod:
 	@echo "📋 Fetching logs from production VM..."
 	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose logs --tail=100 app"
 
 # Follow production logs in real-time
-logs-follow:
+logs-prod-follow:
 	@echo "📋 Following production logs (Ctrl+C to stop)..."
 	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose logs -f app"
 
 # Show all services logs (app + fluent-bit)
-logs-all:
+logs-prod-all:
 	@echo "📋 Fetching all service logs..."
 	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose logs --tail=50"
 
 # Show container status on production
-status:
+status-prod:
 	@echo "📊 Production container status:"
 	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose ps"
 
 # Restart production containers
-restart:
+restart-prod:
 	@echo "🔄 Restarting production containers..."
 	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose restart"
 	@echo "✅ Restarted"

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, feature/*]
+    branches: [develop, feature/*]  # main handled by deploy.yml
   pull_request:
     branches: [main]
 
