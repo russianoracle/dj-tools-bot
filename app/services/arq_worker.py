@@ -46,12 +46,19 @@ setup_logging(
 )
 
 # Configure ARQ framework loggers to use JSON format
+# Get root logger's handlers (which have JSON formatter)
+root_logger = logging.getLogger()
+json_handlers = [h for h in root_logger.handlers if hasattr(h, 'formatter')]
+
 for arq_logger_name in ["arq.worker", "arq.jobs", "arq"]:
     arq_logger = logging.getLogger(arq_logger_name)
     arq_logger.setLevel(logging.INFO)
-    arq_logger.propagate = True  # Use root logger's handlers (JSON format)
-    # Prevent ARQ from adding its own handlers that output to stderr
+    arq_logger.propagate = False  # Don't propagate to avoid duplicates
+    # Remove ARQ's default handlers
     arq_logger.handlers.clear()
+    # Add JSON handlers from root logger
+    for handler in json_handlers:
+        arq_logger.addHandler(handler)
 
 logger = get_logger(__name__)
 
@@ -675,10 +682,6 @@ class WorkerSettings:
 
     # Graceful shutdown - allow jobs to finish
     allow_abort_jobs = False
-
-    # Disable plain text logging - we use JSON logs only
-    log_results = False  # Don't log job results to stdout
-    handle_signals = False  # We handle signals ourselves
 
 
 # Redis pool for enqueueing jobs
