@@ -80,7 +80,7 @@ def synthetic_audio_deterministic():
 @pytest.fixture
 def stft_cache_deterministic(synthetic_audio_deterministic):
     """Create deterministic STFTCache."""
-    from src.core.primitives.stft import compute_stft
+    from app.common.primitives.stft import compute_stft
     y, sr = synthetic_audio_deterministic
     return compute_stft(y, sr=sr)
 
@@ -192,8 +192,8 @@ class TestRegressionBeatGrid:
 
     def test_tempo_within_range(self, beat_audio_deterministic):
         """Detected tempo must be within reasonable range of 128 BPM."""
-        from src.core.primitives.stft import compute_stft
-        from src.core.primitives.beat_grid import compute_beat_grid
+        from app.common.primitives.stft import compute_stft
+        from app.common.primitives.beat_grid import compute_beat_grid
 
         y, sr = beat_audio_deterministic
         cache = compute_stft(y, sr)
@@ -206,8 +206,8 @@ class TestRegressionBeatGrid:
 
     def test_hierarchical_structure(self, beat_audio_deterministic):
         """Beat grid must have valid hierarchical structure."""
-        from src.core.primitives.stft import compute_stft
-        from src.core.primitives.beat_grid import compute_beat_grid
+        from app.common.primitives.stft import compute_stft
+        from app.common.primitives.beat_grid import compute_beat_grid
 
         y, sr = beat_audio_deterministic
         cache = compute_stft(y, sr)
@@ -237,7 +237,7 @@ class TestRegressionFeatureExtraction:
         # This test verifies that the feature extraction pipeline
         # always produces the same number of features
 
-        from src.core.primitives.stft import compute_stft
+        from app.common.primitives.stft import compute_stft
 
         y, sr = synthetic_audio_deterministic
         cache = compute_stft(y, sr)

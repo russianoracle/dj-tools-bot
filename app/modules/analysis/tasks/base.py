@@ -118,9 +118,19 @@ def create_audio_context(
     duration_sec = len(y) / sr
 
     # Compute STFT cache (the foundation for all analysis)
-    stft_cache = compute_stft(
-        y, sr=sr, n_fft=n_fft, hop_length=hop_length
-    )
+    # Use streaming for files >90 min to maintain constant memory
+    from app.common.primitives.streaming_stft import should_use_streaming, compute_stft_streaming
+
+    if should_use_streaming(duration_sec, sr):
+        # Large file: use streaming STFT (constant ~1.5 GB memory)
+        stft_cache = compute_stft_streaming(
+            y, sr=sr, n_fft=n_fft, hop_length=hop_length
+        )
+    else:
+        # Normal file: standard STFT (optimized with scipy.fft + cleanup)
+        stft_cache = compute_stft(
+            y, sr=sr, n_fft=n_fft, hop_length=hop_length
+        )
 
     return AudioContext(
         y=y,

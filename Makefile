@@ -366,27 +366,27 @@ deploy-safe: backup-db deploy-full
 # Show production container logs
 logs-prod:
 	@echo "📋 Fetching logs from production VM..."
-	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose logs --tail=100 app"
+	@ssh -i ~/.ssh/tender-bot-key ubuntu@158.160.122.216 "cd ~/app && docker-compose logs --tail=100 app"
 
 # Follow production logs in real-time
 logs-prod-follow:
 	@echo "📋 Following production logs (Ctrl+C to stop)..."
-	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose logs -f app"
+	@ssh -i ~/.ssh/tender-bot-key ubuntu@158.160.122.216 "cd ~/app && docker-compose logs -f app"
 
 # Show all services logs (app + fluent-bit)
 logs-prod-all:
 	@echo "📋 Fetching all service logs..."
-	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose logs --tail=50"
+	@ssh -i ~/.ssh/tender-bot-key ubuntu@158.160.122.216 "cd ~/app && docker-compose logs --tail=50"
 
 # Show container status on production
 status-prod:
 	@echo "📊 Production container status:"
-	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose ps"
+	@ssh -i ~/.ssh/tender-bot-key ubuntu@158.160.122.216 "cd ~/app && docker-compose ps"
 
 # Restart production containers
 restart-prod:
 	@echo "🔄 Restarting production containers..."
-	@ssh ubuntu@158.160.122.216 "cd ~/app && docker-compose restart"
+	@ssh -i ~/.ssh/tender-bot-key ubuntu@158.160.122.216 "cd ~/app && docker-compose restart"
 	@echo "✅ Restarted"
 
 # ============================================================================
