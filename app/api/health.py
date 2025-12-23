@@ -59,7 +59,7 @@ def get_redis_health() -> Dict[str, Any]:
             "total_commands": info.get("total_commands_processed", 0),
         }
     except Exception as e:
-        logger.error(f"Redis health check failed: {e}")
+        logger.error(f"Redis health check failed: {e}", exc_info=True)
         return {
             "status": "unhealthy",
             "error": str(e),
@@ -92,7 +92,7 @@ def get_disk_health() -> Dict[str, Any]:
             "downloads_mb": round(downloads_size / (1024**2), 2),
         }
     except Exception as e:
-        logger.error(f"Disk health check failed: {e}")
+        logger.error(f"Disk health check failed: {e}", exc_info=True)
         return {
             "status": "unknown",
             "error": str(e),
@@ -112,7 +112,7 @@ def get_memory_health() -> Dict[str, Any]:
             "used_percent": round(mem.percent, 1),
         }
     except Exception as e:
-        logger.error(f"Memory health check failed: {e}")
+        logger.error(f"Memory health check failed: {e}", exc_info=True)
         return {
             "status": "unknown",
             "error": str(e),
@@ -132,7 +132,7 @@ def get_arq_health() -> Dict[str, Any]:
             "queue": "arq:queue",
         }
     except Exception as e:
-        logger.error(f"ARQ health check failed: {e}")
+        logger.error(f"ARQ health check failed: {e}", exc_info=True)
         return {
             "status": "unhealthy",
             "error": str(e),
@@ -159,7 +159,7 @@ def get_cache_health() -> Dict[str, Any]:
             "features_dir_accessible": features_dir_exists,
         }
     except Exception as e:
-        logger.error(f"Cache health check failed: {e}")
+        logger.error(f"Cache health check failed: {e}", exc_info=True)
         return {
             "status": "unhealthy",
             "error": str(e),

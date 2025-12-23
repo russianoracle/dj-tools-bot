@@ -64,14 +64,14 @@ setup_exception_handler(logger)
 # ============================================================================
 
 
-def download_audio(url: str, output_template: str, max_retries: int = 3) -> str:
+def download_audio(url: str, output_template: str, max_retries: int = 5) -> str:
     """
     Download audio using yt-dlp via NAT Gateway with retry logic.
 
     Args:
         url: Audio URL (SoundCloud, YouTube, etc.)
         output_template: Output path template with %(ext)s
-        max_retries: Maximum number of retry attempts (default: 3)
+        max_retries: Maximum number of retry attempts (default: 5)
 
     Returns:
         Path to downloaded file (without extension placeholder)
@@ -187,7 +187,7 @@ def download_audio(url: str, output_template: str, max_retries: int = 3) -> str:
                 last_error = e
                 continue
             else:
-                logger.error(f"Download exception: {e}", data={"attempt": attempt + 1})
+                logger.error(f"Download exception: {e}", data={"attempt": attempt + 1}, exc_info=True)
                 raise
 
     # All retries exhausted
