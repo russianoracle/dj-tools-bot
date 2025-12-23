@@ -34,6 +34,12 @@ from .warnings_config import (
     restore_warnings,
     WarningContext,
 )
+from .utils import (
+    truncate_for_display,
+    truncate_for_metrics,
+    capture_output,
+    setup_exception_handler,
+)
 
 __all__ = [
     # Config
@@ -75,4 +81,9 @@ __all__ = [
     'suppress_all_warnings',
     'restore_warnings',
     'WarningContext',
+    # Logging utils
+    'truncate_for_display',
+    'truncate_for_metrics',
+    'capture_output',
+    'setup_exception_handler',
 ]

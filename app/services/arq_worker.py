@@ -19,6 +19,7 @@ from arq.connections import RedisSettings, ArqRedis
 
 from app.common.logging import get_logger, setup_logging
 from app.common.logging.correlation import set_job_id, set_user_id
+from app.common.logging.utils import truncate_for_display, truncate_for_metrics, capture_output, setup_exception_handler
 from app.common.monitoring import get_metrics_collector
 
 # Graceful shutdown flag
@@ -53,6 +54,9 @@ for arq_logger_name in ["arq.worker", "arq.jobs", "arq"]:
     arq_logger.handlers.clear()
 
 logger = get_logger(__name__)
+
+# Setup global exception handler to catch uncaught exceptions
+setup_exception_handler(logger)
 
 
 # ============================================================================
@@ -127,9 +131,9 @@ def download_audio(url: str, output_template: str, max_retries: int = 3) -> str:
                 return output_template.replace(".%(ext)s", "")
 
             # Download failed - prepare for retry
-            stderr = result.stderr
-            stdout = result.stdout
-            error_msg = stderr[:300] if stderr else stdout[:300]
+            stderr = result.stderr or ""
+            stdout = result.stdout or ""
+            error_msg = stderr if stderr else stdout  # FULL message, no truncation
 
             # Check if error is retryable
             retryable_errors = [
@@ -143,14 +147,22 @@ def download_audio(url: str, output_template: str, max_retries: int = 3) -> str:
             is_retryable = any(err in error_msg for err in retryable_errors)
 
             if is_retryable and attempt < max_retries - 1:
-                logger.warning(f"Download failed (retryable): {error_msg[:150]}", data={
+                logger.warning("Download failed (retryable)", data={
                     "attempt": attempt + 1,
                     "will_retry": True,
+                    "error": error_msg,  # FULL error in structured data
+                    "stderr": stderr,
+                    "stdout": stdout,
                 })
                 last_error = Exception(f"yt-dlp failed: {error_msg}")
                 continue
             else:
-                logger.warning(f"Download failed (non-retryable or final attempt): {error_msg}")
+                logger.warning("Download failed (non-retryable or final attempt)", data={
+                    "attempt": attempt + 1,
+                    "error": error_msg,  # FULL error
+                    "stderr": stderr,
+                    "stdout": stdout,
+                })
                 raise Exception(f"yt-dlp failed: {error_msg}")
 
         except subprocess.TimeoutExpired:
@@ -404,19 +416,20 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
         elapsed = time.time() - _job_start_times.get(job_id, time.time())
 
         # Record failure metrics
+        error_str = str(e)
         metrics = get_metrics_collector()
         metrics.record_task_metrics(
             task_name="analyze_set_task",
             duration_sec=elapsed,
             success=False,
-            error=str(e)[:200],
+            error=truncate_for_metrics(error_str),  # Truncate for metrics storage
         )
 
         logger.error("Analysis failed", data={
             "job_id": job_id,
             "user_id": user_id,
             "file_path": file_path,
-            "error": str(e),
+            "error": error_str,  # FULL error in logs
         }, exc_info=True)
 
         # Cleanup on error
@@ -431,13 +444,13 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
                 logger.warning("Failed to cleanup temp file", data={
                     "job_id": job_id,
                     "file_path": file_path,
-                    "error": str(cleanup_error),
+                    "error": str(cleanup_error),  # FULL cleanup error
                 })
 
         _job_results[job_id] = {
             "state": "FAILURE",
             "progress": 0,
-            "status": f"❌ Failed: {str(e)[:100]}",
+            "status": f"❌ Failed: {truncate_for_display(error_str)}",  # Truncate for UI
         }
 
         return {
@@ -527,25 +540,26 @@ async def download_and_analyze_task(ctx: dict, url: str, user_id: int) -> Dict[s
         elapsed = time.time() - _job_start_times.get(job_id, time.time())
 
         # Record download failure metrics
+        error_str = str(e)
         metrics = get_metrics_collector()
         metrics.record_task_metrics(
             task_name="download_and_analyze_task",
             duration_sec=elapsed,
             success=False,
-            error=str(e)[:200],
+            error=truncate_for_metrics(error_str),  # Truncate for metrics storage
         )
 
         logger.error("Download failed", data={
             "job_id": job_id,
             "user_id": user_id,
-            "url": url[:100],
-            "error": str(e),
+            "url": url[:100],  # URL can stay truncated for brevity
+            "error": error_str,  # FULL error in logs
         }, exc_info=True)
 
         _job_results[job_id] = {
             "state": "FAILURE",
             "progress": 0,
-            "status": f"❌ Download failed: {str(e)[:80]}",
+            "status": f"❌ Download failed: {truncate_for_display(error_str)}",  # Truncate for UI
         }
 
         return {
@@ -578,10 +592,11 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
             result = await job.result()
             if isinstance(result, dict):
                 if result.get("status") == "failed":
+                    error = result.get('error', 'Unknown error')
                     return {
                         "state": "FAILURE",
                         "progress": 0,
-                        "status": f"❌ {result.get('error', 'Unknown error')[:100]}",
+                        "status": f"❌ {truncate_for_display(error)}",
                     }
                 return {
                     "state": "SUCCESS",
@@ -632,11 +647,12 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
                 "status": f"Unknown status: {status}",
             }
     except Exception as e:
-        logger.warning(f"Failed to get job status: {e}")
+        error_str = str(e)
+        logger.warning("Failed to get job status", data={"error": error_str})  # FULL error in logs
         return {
             "state": "UNKNOWN",
             "progress": 0,
-            "status": f"Status unavailable: {str(e)[:50]}",
+            "status": f"Status unavailable: {truncate_for_display(error_str, max_length=80)}",
         }
 
 
