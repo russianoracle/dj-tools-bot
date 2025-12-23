@@ -1,1 +1,1 @@
-../mood-classifier/flatten-log.lua
+/Users/artemgusarov/Music/ai_app/mood-classifier/flatten-log.lua

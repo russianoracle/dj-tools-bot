@@ -1,1 +1,1 @@
-../mood-classifier/set-source.lua
+/Users/artemgusarov/Music/ai_app/mood-classifier/set-source.lua

@@ -1,1 +1,1 @@
-../mood-classifier/main.py
+/Users/artemgusarov/Music/ai_app/mood-classifier/main.py

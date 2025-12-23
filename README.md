@@ -1,1 +1,1 @@
-../mood-classifier/README.md
+/Users/artemgusarov/Music/ai_app/mood-classifier/README.md

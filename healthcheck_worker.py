@@ -1,1 +1,1 @@
-../mood-classifier/healthcheck_worker.py
+/Users/artemgusarov/Music/ai_app/mood-classifier/healthcheck_worker.py

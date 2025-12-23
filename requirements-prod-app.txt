@@ -1,1 +1,1 @@
-../mood-classifier/requirements-prod-app.txt
+/Users/artemgusarov/Music/ai_app/mood-classifier/requirements-prod-app.txt
