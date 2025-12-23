@@ -1,1 +1,7 @@
-/Users/artemgusarov/Music/ai_app/mood-classifier/.gitleaksignore
+# GitHub Actions runner registration tokens (expire in 1 hour)
+AIWS4CBCYMKSKKQJYZLHEGLJH5NKU
+AIWS4CGCIH
+
+# These are temporary tokens from gh CLI that expire quickly
+scripts/install-runner-on-bot-vm.sh:*RUNNER_TOKEN*
+scripts/deploy-runner.sh:*RUNNER_TOKEN*

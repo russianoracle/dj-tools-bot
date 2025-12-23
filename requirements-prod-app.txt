@@ -1,1 +1,32 @@
-/Users/artemgusarov/Music/ai_app/mood-classifier/requirements-prod-app.txt
+# ============================================================================
+# APP-SPECIFIC PRODUCTION DEPENDENCIES
+# ============================================================================
+# Used with app-base:3.12 which includes:
+# - numpy, scipy, scikit-learn (installed in Dockerfile.base)
+
+# Audio Processing (БЕЗ numpy/scipy - они в base)
+librosa>=0.10.0
+soundfile>=0.12.0
+audioread>=3.0.0
+
+# Machine Learning - ТОЛЬКО app-specific
+xgboost>=2.0.0
+
+# Metadata
+mutagen>=1.47.0
+
+# Utilities
+pyyaml>=6.0
+tqdm>=4.65.0
+psutil>=5.9.0
+
+# Telegram Bot
+aiogram>=3.0.0
+python-dotenv>=1.0.0
+
+# Task Queue
+arq>=0.25.0
+redis>=5.0.0
+
+# Yandex Cloud SDK (Monitoring, Logging)
+yandexcloud>=0.298.0

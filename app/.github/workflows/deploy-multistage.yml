@@ -1,0 +1,251 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: cr.yandex
+  IMAGE_NAME: mood-classifier
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ============================================
+  # JOB 2: Build (uses local cache, skips if valid)
+  # ============================================
+  build:
+    name: Build Image
+    runs-on: self-hosted
+    outputs:
+      image_tag: ${{ steps.build.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to registry
+        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+
+      - name: Setup buildx
+        run: |
+          # Use default docker driver (shares credentials with host)
+          docker buildx use default || true
+
+      - name: Ensure app-base exists (build once, cache forever)
+        run: |
+          APP_BASE="${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/app-base:${{ env.PYTHON_VERSION }}"
+
+          # Pull requires login (already done in previous step)
+          if docker pull "$APP_BASE"; then
+            echo "✓ app-base exists in registry (using cached)"
+          else
+            echo "⚙️ app-base not found, building once..."
+            docker buildx build \
+              -f Dockerfile.base \
+              --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
+              --build-arg REGISTRY=${{ env.REGISTRY }} \
+              --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
+              --push \
+              -t "$APP_BASE" \
+              .
+            echo "✓ app-base built and pushed (next builds will be fast)"
+          fi
+
+      - name: Build test image (fast - only copies app/)
+        id: build
+        run: |
+          IMAGE_TAG="mood-classifier:test-${{ github.sha }}"
+
+          # Check if image already exists
+          if docker image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "✓ Image already exists, skipping build"
+          else
+            echo "Building $IMAGE_TAG (using cached app-base)..."
+            docker buildx build \
+              --target test \
+              --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
+              --build-arg REGISTRY=${{ env.REGISTRY }} \
+              --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
+              --load \
+              -t "$IMAGE_TAG" \
+              -f Dockerfile.unified \
+              .
+            echo "✓ Build complete (only app/ copied, deps from cache)"
+          fi
+
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
+
+  # ============================================
+  # JOB 3: Tests (matrix: 2 runners in parallel)
+  # Runner 1: container + integration (sequential)
+  # Runner 2: unit tests (parallel)
+  # ============================================
+  test:
+    name: Tests (${{ matrix.suite }})
+    runs-on: self-hosted
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: container-integration
+            markers: "container or integration or pipeline"
+          - suite: unit
+            markers: "unit"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Redis and test container
+        run: |
+          # Use different port per suite to avoid conflicts
+          if [ "${{ matrix.suite }}" = "container-integration" ]; then
+            REDIS_PORT=6380
+          else
+            REDIS_PORT=6381
+          fi
+
+          # Start Redis
+          docker rm -f redis-test-${{ matrix.suite }} 2>/dev/null || true
+          docker run -d --name redis-test-${{ matrix.suite }} -p ${REDIS_PORT}:6379 redis:7-alpine
+          sleep 2
+          echo "✓ Redis started on port ${REDIS_PORT}"
+
+          # Start test container with correct Redis port
+          CONTAINER_NAME="test-app-${{ matrix.suite }}"
+          docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+          docker run -d \
+            --name "$CONTAINER_NAME" \
+            --network host \
+            -e DATA_DIR=/data \
+            -e DOWNLOADS_DIR=/tmp/downloads \
+            -e REDIS_HOST=localhost \
+            -e REDIS_PORT=${REDIS_PORT} \
+            -v $(pwd)/tests:/app/tests \
+            ${{ needs.build.outputs.image_tag }} \
+            sleep infinity
+
+          echo "✓ Test container $CONTAINER_NAME started (Redis port: ${REDIS_PORT})"
+          echo "REDIS_TEST_PORT=${REDIS_PORT}" >> $GITHUB_ENV
+
+      - name: Run ${{ matrix.suite }} tests
+        run: |
+          CONTAINER_NAME="test-app-${{ matrix.suite }}"
+          docker exec "$CONTAINER_NAME" \
+            pytest tests/ -m "${{ matrix.markers }}" -vv --tb=short
+
+      - name: Cleanup
+        if: always()
+        run: |
+          CONTAINER_NAME="test-app-${{ matrix.suite }}"
+          docker rm -f "$CONTAINER_NAME" || true
+          docker rm -f redis-test-${{ matrix.suite }} || true
+
+  # ============================================
+  # JOB 4: Push Production Image
+  # ============================================
+  push:
+    name: Push to Registry
+    runs-on: self-hosted
+    needs: test
+    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to registry
+        run: echo '${{ secrets.YC_SA_JSON_KEY }}' | docker login ${{ env.REGISTRY }} --username json_key --password-stdin
+
+      - name: Setup buildx
+        run: docker buildx use ci-builder
+
+      - name: Build and push production
+        run: |
+          docker buildx build \
+            --target production \
+            --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
+            --build-arg REGISTRY=${{ env.REGISTRY }} \
+            --build-arg REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }} \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --push \
+            -t ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ secrets.YC_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest \
+            -f Dockerfile.unified \
+            .
+
+          echo "✓ Production image pushed"
+
+      - name: Logout
+        if: always()
+        run: docker logout ${{ env.REGISTRY }}
+
+  # ============================================
+  # JOB 5: Deploy (docker-compose + Lockbox)
+  # ============================================
+  deploy:
+    name: Deploy
+    runs-on: self-hosted
+    needs: push
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch secrets from Lockbox
+        run: |
+          # Fetch secrets and create .env file for docker-compose
+          SECRET_ID="e6qrhl953e11s6flf61n"
+          /opt/yc/bin/yc lockbox payload get --id "$SECRET_ID" --format json | \
+            jq -r '.entries[] | "\(.key | ascii_upcase)=\(.text_value)"' > .env
+
+          # Add registry vars for docker-compose
+          echo "REGISTRY=${{ env.REGISTRY }}" >> .env
+          echo "REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}" >> .env
+          echo "TAG=latest" >> .env
+
+          echo "✓ Secrets fetched from Lockbox"
+
+      - name: Deploy with docker-compose
+        run: |
+          # Login using IAM token from VM metadata
+          IAM_TOKEN=$(curl -s -H 'Metadata-Flavor: Google' \
+            http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token | jq -r '.access_token')
+          echo "$IAM_TOKEN" | docker login ${{ env.REGISTRY }} --username iam --password-stdin
+
+          # Stop old containers (including standalone ones not in compose)
+          docker stop mood-classifier mood-arq-worker mood-redis 2>/dev/null || true
+          docker rm mood-classifier mood-arq-worker mood-redis 2>/dev/null || true
+          docker-compose down --remove-orphans 2>/dev/null || true
+
+          # Pull and start services
+          docker-compose pull
+          docker-compose up -d
+
+          # Wait for services to start
+          sleep 5
+          docker-compose ps
+          docker-compose logs --tail=20 bot
+
+          # Cleanup
+          rm -f .env
+          docker logout ${{ env.REGISTRY }}
+          echo "✓ Deployed with docker-compose"
+
+  # ============================================
+  # JOB 6: Cleanup
+  # ============================================
+  cleanup:
+    name: Cleanup
+    runs-on: self-hosted
+    needs: push
+    if: always()
+    steps:
+      - name: Clean old images
+        run: |
+          docker images --format "{{.Repository}}:{{.Tag}}" | \
+            grep "mood-classifier:test-" | \
+            tail -n +3 | \
+            xargs -r docker rmi -f || true
+          docker image prune -f
+          echo "✓ Cleanup done"
