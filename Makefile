@@ -396,7 +396,7 @@ restart-prod:
 # Show cache statistics
 cache-stats:
 	@echo "📊 Cache Statistics:"
-	@$(PYTHON) -c "from app.core.connectors import CacheRepository; \
+	@$(PYTHON) -c "from app.core.cache import CacheRepository; \
 		repo = CacheRepository.get_instance(); \
 		stats = repo._manager.get_track_metadata_stats(); \
 		print(f'  Tracks: {stats[\"total_tracks\"]}'); \
@@ -407,7 +407,7 @@ cache-stats:
 # Clean old cache entries
 cache-clean:
 	@echo "🧹 Cleaning old cache entries (30+ days)..."
-	@$(PYTHON) -c "from app.core.connectors import CacheRepository; \
+	@$(PYTHON) -c "from app.core.cache import CacheRepository; \
 		repo = CacheRepository.get_instance(); \
 		repo._manager.cleanup_old_entries(max_age_days=30); \
 		print('✅ Cleaned')"

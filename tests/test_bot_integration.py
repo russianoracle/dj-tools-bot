@@ -532,7 +532,7 @@ async def run_e2e_flow(ctx: E2ETestContext) -> E2ETestResult:
 
         try:
             from app.modules.profiling.services.profiler import ProfilingService
-            from app.core.connectors import CacheRepository
+            from app.core.cache import CacheRepository
 
             # Create profiler with our test cache
             cache_repo = CacheRepository(ctx.cache_dir)
@@ -572,7 +572,7 @@ async def run_e2e_flow(ctx: E2ETestContext) -> E2ETestResult:
 
         try:
             from app.modules.generation.pipelines.set_generator import SetGeneratorPipeline
-            from app.core.connectors import CacheRepository
+            from app.core.cache import CacheRepository
 
             # Create generator with our test cache
             cache_repo = CacheRepository(ctx.cache_dir)

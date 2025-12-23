@@ -4,7 +4,7 @@ function flatten_log(tag, timestamp, record)
 
     -- If log is a map/table with nested fields, flatten it
     if type(log) == "table" then
-        -- Extract nested fields
+        -- Extract nested fields from parsed JSON
         if log["message"] then
             record["log"] = log["message"]
         end
@@ -20,7 +20,22 @@ function flatten_log(tag, timestamp, record)
         if log["timestamp"] then
             record["app_timestamp"] = log["timestamp"]
         end
+        if log["user_id"] then
+            record["user_id"] = log["user_id"]
+        end
+        if log["job_id"] then
+            record["job_id"] = log["job_id"]
+        end
+        if log["correlation_id"] then
+            record["correlation_id"] = log["correlation_id"]
+        end
     end
+
+    -- Clean up parser-extracted fields (avoid duplicates)
+    record["level"] = nil
+    record["component"] = nil
+    record["logger"] = nil
+    record["timestamp"] = nil
 
     return 2, timestamp, record
 end
