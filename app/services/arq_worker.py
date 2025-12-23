@@ -46,19 +46,12 @@ setup_logging(
 )
 
 # Configure ARQ framework loggers to use JSON format
-# Get root logger's handlers (which have JSON formatter)
-root_logger = logging.getLogger()
-json_handlers = [h for h in root_logger.handlers if hasattr(h, 'formatter')]
-
 for arq_logger_name in ["arq.worker", "arq.jobs", "arq"]:
     arq_logger = logging.getLogger(arq_logger_name)
     arq_logger.setLevel(logging.INFO)
-    arq_logger.propagate = False  # Don't propagate to avoid duplicates
-    # Remove ARQ's default handlers
+    arq_logger.propagate = True  # Use root logger's JSON handlers
+    # Clear ARQ's default handlers to avoid duplicates
     arq_logger.handlers.clear()
-    # Add JSON handlers from root logger
-    for handler in json_handlers:
-        arq_logger.addHandler(handler)
 
 logger = get_logger(__name__)
 
