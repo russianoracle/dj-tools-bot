@@ -95,9 +95,18 @@ class CacheRepository(ICacheStatusProvider):
         self._manager = CacheManager(str(self.cache_dir))
 
     @classmethod
-    def get_instance(cls, cache_dir: str = "cache") -> 'CacheRepository':
-        """Get singleton instance."""
+    def get_instance(cls, cache_dir: Optional[str] = None) -> 'CacheRepository':
+        """
+        Get singleton instance.
+
+        Args:
+            cache_dir: Cache directory path. If None, uses DATA_DIR environment variable
+                      (default: /data in production, 'cache' in development)
+        """
         if cls._instance is None:
+            if cache_dir is None:
+                # Use DATA_DIR from environment (volume-backed in production)
+                cache_dir = os.getenv('DATA_DIR', 'cache')
             cls._instance = cls(cache_dir)
         return cls._instance
 

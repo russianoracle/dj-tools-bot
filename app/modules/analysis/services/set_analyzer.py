@@ -152,7 +152,7 @@ class AnalysisService:
     def __init__(
         self,
         cache_status: Optional[ICacheStatusProvider] = None,
-        cache_dir: str = "cache",
+        cache_dir: Optional[str] = None,
         sr: int = 22050,
     ):
         """
@@ -160,9 +160,15 @@ class AnalysisService:
 
         Args:
             cache_status: Read-only cache status provider (for UI queries)
-            cache_dir: Cache directory path (used if cache_status not provided)
+            cache_dir: Cache directory path (used if cache_status not provided).
+                      If None, uses DATA_DIR environment variable.
             sr: Sample rate for analysis
         """
+        # Use DATA_DIR from environment if cache_dir not specified
+        if cache_dir is None:
+            import os
+            cache_dir = os.getenv('DATA_DIR', 'cache')
+
         self.cache_dir = cache_dir
         self.sr = sr
 
