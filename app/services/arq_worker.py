@@ -676,6 +676,10 @@ class WorkerSettings:
     # Graceful shutdown - allow jobs to finish
     allow_abort_jobs = False
 
+    # Disable plain text logging - we use JSON logs only
+    log_results = False  # Don't log job results to stdout
+    handle_signals = False  # We handle signals ourselves
+
 
 # Redis pool for enqueueing jobs
 _redis_pool: Optional[ArqRedis] = None
