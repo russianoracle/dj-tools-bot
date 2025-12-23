@@ -50,6 +50,9 @@ help:
 # Python executable
 PYTHON := /Applications/miniforge3/bin/python3
 
+# GitHub CLI executable
+GH_BIN := /opt/homebrew/bin/gh
+
 # Start full stack (Redis + Bot)
 start:
 	@echo "🚀 Starting DJ Tools Bot..."
@@ -159,7 +162,7 @@ sync-to-deploy:
 	@echo "  → Copying .github/workflows/"
 	@rsync -av --delete .github/workflows/ $(DEPLOY_REPO)/.github/workflows/
 	@echo "  → Copying models/production/"
-	@rsync -av --delete models/production/ $(DEPLOY_REPO)/models/
+	@rsync -av --delete models/production/ $(DEPLOY_REPO)/models/production/
 	@echo "  → Copying Docker files"
 	@cp Dockerfile.unified Dockerfile.base docker-compose.yml $(DEPLOY_REPO)/ || true
 	@echo "  → Copying config files"
@@ -170,9 +173,16 @@ sync-to-deploy:
 	@cp Makefile $(DEPLOY_REPO)/ || true
 	@echo "✅ Files synced to $(DEPLOY_REPO)"
 
+# Cancel running GitHub Actions workflows before deploy
+cancel-running-jobs:
+	@echo "🛑 Canceling running GitHub Actions workflows..."
+	@cd $(DEPLOY_REPO) && $(GH_BIN) run list --status in_progress --json databaseId -q '.[].databaseId' | \
+		xargs -I {} $(GH_BIN) api --method POST /repos/russianoracle/dj-tools-bot/actions/runs/{}/cancel 2>/dev/null || true
+	@echo "✅ All running jobs canceled"
+
 # Deploy only app/ folder to dj-tools-bot repo (production code only)
 # Usage: make deploy MSG="your commit message"
-deploy: pre-deploy
+deploy: pre-deploy cancel-running-jobs
 	@echo "🚀 Quick deploy: app/ only"
 	@echo ""
 	@echo "📝 Step 1: Commit changes in mood-classifier (dev repo)"
@@ -193,7 +203,7 @@ deploy: pre-deploy
 
 # Deploy full infrastructure (app/ + tests/ + docker + configs)
 # Usage: make deploy-full MSG="your commit message"
-deploy-full: pre-deploy
+deploy-full: pre-deploy cancel-running-jobs
 	@echo "🚀 Full deploy: all production files"
 	@echo ""
 	@echo "📝 Step 1: Commit ALL changes in mood-classifier (dev repo)"
@@ -326,4 +336,4 @@ validate-secrets:
 		ok, missing = validate_secrets(); \
 		exit(0 if ok else 1)"
 
-.PHONY: pre-deploy sync-to-deploy deploy deploy-full deploy-sync-only backup-db deploy-safe cache-stats cache-clean data-dir sync-rekordbox fetch-secrets validate-secrets
+.PHONY: pre-deploy sync-to-deploy cancel-running-jobs deploy deploy-full deploy-sync-only backup-db deploy-safe cache-stats cache-clean data-dir sync-rekordbox fetch-secrets validate-secrets
