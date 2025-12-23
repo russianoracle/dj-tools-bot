@@ -27,6 +27,9 @@ WORKDIR /app
 # Copy application code (this is what changes frequently)
 COPY --chown=appuser:appuser app/ ./app/
 
+# Copy healthcheck script (required for worker healthcheck)
+COPY --chown=appuser:appuser healthcheck_worker.py ./
+
 # Copy models
 COPY --chown=appuser:appuser models/production/ ./models/production/
 
