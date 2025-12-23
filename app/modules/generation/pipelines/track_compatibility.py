@@ -25,7 +25,7 @@ from .base import (
     Pipeline, PipelineContext, PipelineStage,
     LoadAudioStage, ComputeSTFTStage,
 )
-from app.core.connectors import CacheRepository
+from app.core.cache import CacheRepository
 from app.modules.analysis.tasks import (
     # Existing Tasks
     KeyAnalysisTask,

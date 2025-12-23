@@ -22,7 +22,7 @@ from pathlib import Path
 from enum import Enum
 
 from app.common.logging import get_logger
-from app.core.connectors import CacheRepository
+from app.core.cache import CacheRepository
 from .track_compatibility import (
     TrackCompatibilityPipeline,
     TrackCompatibilityResult,
