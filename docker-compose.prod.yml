@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: mood-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  app:
+    image: ${REGISTRY}/${REGISTRY_ID}/mood-classifier:latest
+    container_name: mood-classifier
+    restart: unless-stopped
+    volumes:
+      - mood-data:/data
+    env_file:
+      - .env
+    environment:
+      - DATA_DIR=/data
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "mood-classifier"
+
+  arq-worker:
+    image: ${REGISTRY}/${REGISTRY_ID}/mood-classifier:latest
+    container_name: mood-arq-worker
+    restart: unless-stopped
+    command: ["arq", "app.services.arq_worker.WorkerSettings"]
+    volumes:
+      - mood-data:/data
+    environment:
+      - DATA_DIR=/data
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DOWNLOADS_DIR=/data/downloads
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "arq-worker"
+
+  fluent-bit:
+    image: cr.yandex/yc/fluent-bit-plugin-yandex:v1.0.4-fluent-bit-1.8.6
+    container_name: fluent-bit
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    depends_on:
+      - app
+    command: ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/fluent-bit.conf"]
+
+volumes:
+  mood-data:
+    external: true
+  redis-data:

@@ -1,0 +1,8 @@
+# Rekordbox 6 public database key - same for all installations
+# See: https://github.com/dylanljones/pyrekordbox/discussions/97
+app/modules/generation/pipelines/set_generator.py:RB6_DB_KEY
+
+# VPN proxy credentials from Happ subscription - used for geo-bypass
+# These are user's personal VPN subscription credentials, not secrets
+app/services/arq_worker.py:362229f7-9a9c-4810-8986-a2377f7d3bf9
+app/services/arq_worker.py:UPm3HNg8x4uAzAxThpaSnABG9uRoJa3j

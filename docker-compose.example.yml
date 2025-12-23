@@ -1,0 +1,106 @@
+# Example docker-compose.yml with persistent data
+# Full production setup with data persistence for bot + worker + Redis
+
+version: '3.9'
+
+services:
+  bot:
+    build: .
+    container_name: mood-classifier-bot
+    restart: unless-stopped
+    environment:
+      # КРИТИЧНО: DATA_DIR для разделения code/data
+      - DATA_DIR=/data
+      - REDIS_URL=redis://redis:6379/0
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_USER_ID=${ADMIN_USER_ID}
+      - MAX_FILE_SIZE_MB=500
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      # КРИТИЧНО: Персистентные данные (БД, кеш)
+      - mood_data:/data
+      # Временные загрузки (можно не персистить)
+      - downloads_data:/app/downloads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  worker:
+    build: .
+    container_name: mood-classifier-worker
+    command: arq app.services.arq_worker.WorkerSettings
+    restart: unless-stopped
+    environment:
+      - DATA_DIR=/data
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      # КРИТИЧНО: Те же данные что и bot (shared cache)
+      - mood_data:/data
+      - downloads_data:/app/downloads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mood-classifier-redis
+    restart: unless-stopped
+    # КРИТИЧНО: --appendonly yes для персистентности очереди ARQ
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      # КРИТИЧНО: Redis AOF файлы (задачи не теряются)
+      - redis_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  # Named volumes persist data independently from containers
+  # При обновлении кода (docker-compose up --build) данные НЕ теряются!
+  mood_data:
+    # SQLite БД (predictions.db), STFT кеш, features кеш
+  downloads_data:
+    # Временные загрузки пользователей
+  redis_data:
+    # Redis AOF (очередь задач ARQ)
+
+networks:
+  app-network:
+    driver: bridge
+
+# ============================================================================
+# Usage:
+# ============================================================================
+#
+# 1. Create .env file:
+#    cp .env.example .env
+#    # Edit TELEGRAM_BOT_TOKEN, ADMIN_USER_ID
+#
+# 2. First start:
+#    docker-compose -f docker-compose.example.yml up -d
+#
+# 3. Update code (БЕЗ потери данных):
+#    docker-compose -f docker-compose.example.yml pull
+#    docker-compose -f docker-compose.example.yml up -d --build
+#    # ✅ Volumes mood_data, redis_data НЕ затронуты!
+#
+# 4. Backup database:
+#    docker exec mood-classifier-bot sqlite3 /data/predictions.db .dump > backup.sql
+#
+# 5. Backup Redis:
+#    docker exec mood-classifier-redis redis-cli BGSAVE
+#
+# 6. View volumes:
+#    docker volume ls
+#    docker volume inspect <project>_mood_data
+#
+# ============================================================================

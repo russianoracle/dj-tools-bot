@@ -1,0 +1,150 @@
+version: "3.9"
+
+# =============================================================================
+# Yandex Lockbox Integration
+# =============================================================================
+# Before starting, run: ./scripts/fetch-secrets.sh
+# This creates .env file from Lockbox secrets
+#
+# Required secrets in Lockbox (YC_LOCKBOX_SECRET_ID):
+#   - TELEGRAM_BOT_TOKEN (required)
+#   - ADMIN_USER_ID (optional)
+#   - YC_LOG_GROUP_ID (optional, for cloud logging)
+# =============================================================================
+
+services:
+  bot:
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/mood-classifier:${TAG:-latest}
+    container_name: mood-classifier
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Infrastructure (override .env if needed)
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATA_DIR=/data
+      - DOWNLOADS_DIR=/data/downloads
+      - MAX_FILE_SIZE_MB=500
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_JSON_FORMAT=${LOG_JSON_FORMAT:-true}
+      # Secrets validation
+      - REQUIRE_SECRETS=${REQUIRE_SECRETS:-true}
+      # Lockbox runtime loading (fallback if .env incomplete)
+      - YC_LOCKBOX_SECRET_ID=${YC_LOCKBOX_SECRET_ID:-}
+      - YC_FOLDER_ID=${YC_FOLDER_ID:-}
+      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
+    volumes:
+      # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
+      - mood_data:/data
+      - downloads_data:/app/downloads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import redis; r = redis.Redis(host='redis', port=6379); r.ping()"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    image: ${REGISTRY:-cr.yandex}/${REGISTRY_ID:-crp78hhr2t67jkeedad1}/mood-classifier:${TAG:-latest}
+    container_name: mood-arq-worker
+    command: arq app.services.arq_worker.WorkerSettings
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Infrastructure
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATA_DIR=/data
+      - DOWNLOADS_DIR=/data/downloads
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_JSON_FORMAT=${LOG_JSON_FORMAT:-true}
+      # Lockbox (for consistency with bot)
+      - YC_LOCKBOX_SECRET_ID=${YC_LOCKBOX_SECRET_ID:-}
+      - YC_FOLDER_ID=${YC_FOLDER_ID:-}
+      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
+    volumes:
+      # КРИТИЧНО: /data для БД и кеша (НЕ удаляется при обновлении)
+      - mood_data:/data
+      - downloads_data:/app/downloads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 10G
+        reservations:
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "python", "healthcheck_worker.py"]
+      interval: 60s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: mood-redis
+    restart: unless-stopped
+    # ВАЖНО: --appendonly yes для персистентности очереди задач
+    # При рестарте контейнера ARQ задачи НЕ теряются
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      # КРИТИЧНО: Redis AOF файлы в volume (задачи не теряются при обновлении)
+      - redis_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  fluent-bit:
+    image: cr.yandex/yc/fluent-bit-plugin-yandex:v2.1.1-fluent-bit-2.1.7
+    container_name: mood-fluent-bit
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      - YC_LOG_GROUP_ID=${YC_LOG_GROUP_ID:-}
+    volumes:
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - ./set-source.lua:/fluent-bit/etc/set-source.lua:ro
+      - ./detect-level.lua:/fluent-bit/etc/detect-level.lua:ro
+      - ./flatten-log.lua:/fluent-bit/etc/flatten-log.lua:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  # КРИТИЧНО: Персистентные данные (выживают при обновлении контейнеров)
+  mood_data:
+    # БД (predictions.db), STFT кеш, features кеш
+  downloads_data:
+    # Временные загрузки пользователей
+  redis_data:
+    # Redis persistence (AOF) - очередь задач ARQ
+
+networks:
+  app-network:
+    driver: bridge

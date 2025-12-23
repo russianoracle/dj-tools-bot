@@ -335,10 +335,14 @@ async def analyze_set_task(ctx: dict, file_path: str, user_id: int) -> Dict[str,
             logger.info(f"[{job_id}] {progress}% - {stage_name}")
 
         # Run analysis
+        from app.modules.analysis.config import MixingStyle
+
+        # Use SMOOTH mixing style (calibrated for techno/minimal long blends)
         pipeline = SetAnalysisPipeline(
             sr=22050,
             analyze_genres=False,
             verbose=False,
+            mixing_style=MixingStyle.SMOOTH,  # Calibrated params for smooth mixing
         )
         pipeline.on_stage_complete = on_stage_complete
 

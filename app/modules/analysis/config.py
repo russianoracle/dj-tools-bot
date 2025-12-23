@@ -20,13 +20,13 @@ class MixingStyle(Enum):
 class TransitionConfig:
     """Configuration for transition detection."""
     min_transition_gap_sec: float = 30.0
-    energy_threshold: float = 0.3
+    energy_threshold: float = 0.25
     bass_weight: float = 0.5
     smooth_sigma: float = 5.0
     detect_filters: bool = True
     filter_velocity_threshold: float = 500.0
     # Peak detection percentile (lower = more sensitive)
-    peak_percentile: float = 90.0
+    peak_percentile: float = 85.0
     # Window to merge nearby mixin/mixout points into single transition zone
     transition_merge_window_sec: float = 90.0
     # Timbral weight for mixin detection (0=energy-based, 1=timbral-only)
@@ -93,10 +93,10 @@ class TransitionConfig:
 @dataclass
 class DropDetectionConfig:
     """Configuration for drop detection."""
-    min_drop_magnitude: float = 0.3   # Minimum energy jump (0-1)
-    min_confidence: float = 0.5       # Minimum confidence threshold
-    buildup_window_sec: float = 2.0   # Lookback window for buildup
-    use_multiband: bool = True        # Use mel-band weighted energy
+    min_drop_magnitude: float = 0.25
+    min_confidence: float = 0.4
+    buildup_window_sec: float = 2.0
+    use_multiband: bool = True
 
     @classmethod
     def for_style(cls, style: MixingStyle) -> 'DropDetectionConfig':
