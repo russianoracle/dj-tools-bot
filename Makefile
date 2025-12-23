@@ -33,9 +33,9 @@ help:
 	@echo "🧪 Testing:"
 	@echo "  make test         - Run tests"
 	@echo ""
-	@echo "📦 Deployment:"
+	@echo "📦 Deployment (automated graceful shutdown - zero data loss):"
 	@echo "  make deploy               - Quick deploy (app/ only) → GitHub Actions"
-	@echo "  make deploy-full          - Full deploy (all files) → GitHub Actions"
+	@echo "  make deploy-full          - Full deploy (all files) → GitHub Actions ⭐ RECOMMENDED"
 	@echo "  make deploy-safe          - Deploy with DB backup"
 	@echo "  make deploy-sync-only     - Sync files without git operations"
 	@echo "  make pre-deploy           - Run pre-deploy checks"
@@ -53,9 +53,10 @@ help:
 	@echo "  make clean            - Clean cache and logs"
 	@echo ""
 	@echo "📖 Documentation:"
-	@echo "  docs/DATA_PERSISTENCE.md   - Data persistence guide"
-	@echo "  DEPLOY_CHECKLIST.md        - Deployment checklist"
-	@echo "  .env.example               - Environment configuration"
+	@echo "  docs/GRACEFUL_DEPLOYMENT.md - Graceful deployment guide"
+	@echo "  docs/DATA_PERSISTENCE.md    - Data persistence guide"
+	@echo "  DEPLOY_CHECKLIST.md         - Deployment checklist"
+	@echo "  .env.example                - Environment configuration"
 
 # Python executable
 PYTHON := /Applications/miniforge3/bin/python3
@@ -286,6 +287,8 @@ sync-to-deploy:
 	@echo "  → Copying scripts/"
 	@mkdir -p $(DEPLOY_REPO)/scripts
 	@cp scripts/fetch-secrets.sh $(DEPLOY_REPO)/scripts/ || true
+	@cp scripts/graceful-deploy.sh $(DEPLOY_REPO)/scripts/ || true
+	@chmod +x $(DEPLOY_REPO)/scripts/*.sh 2>/dev/null || true
 	@echo "✅ Files synced to $(DEPLOY_REPO)"
 
 # Cancel running GitHub Actions workflows before deploy
@@ -383,11 +386,20 @@ status-prod:
 	@echo "📊 Production container status:"
 	@ssh -i ~/.ssh/tender-bot-key ubuntu@158.160.122.216 "cd ~/app && docker-compose ps"
 
-# Restart production containers
+# Restart production containers (graceful - waits for queue drain)
 restart-prod:
-	@echo "🔄 Restarting production containers..."
-	@ssh -i ~/.ssh/tender-bot-key ubuntu@158.160.122.216 "cd ~/app && docker-compose restart"
-	@echo "✅ Restarted"
+	@echo "🔄 Gracefully restarting production containers..."
+	@echo ""
+	@echo "⚠️  This will:"
+	@echo "   1. Wait for Redis queue to drain (max 5 min)"
+	@echo "   2. Gracefully stop containers (SIGTERM, allows cleanup)"
+	@echo "   3. Start containers with health checks"
+	@echo ""
+	@read -p "Continue? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	@ssh ubuntu@158.160.122.216 "cd ~/app && TIMEOUT_MINUTES=5 HEALTH_CHECK_RETRIES=30 ./scripts/graceful-deploy.sh"
+	@echo ""
+	@echo "✅ Restart completed!"
+	@$(MAKE) status-prod
 
 # ============================================================================
 # DATA MANAGEMENT

@@ -206,31 +206,27 @@ jobs:
 
           echo "✓ Secrets fetched from Lockbox"
 
-      - name: Deploy with docker-compose
+      - name: Deploy with graceful shutdown
         run: |
           # Login using IAM token from VM metadata
           IAM_TOKEN=$(curl -s -H 'Metadata-Flavor: Google' \
             http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token | jq -r '.access_token')
           echo "$IAM_TOKEN" | docker login ${{ env.REGISTRY }} --username iam --password-stdin
 
-          # Stop old containers (including standalone ones not in compose)
-          docker stop mood-classifier mood-arq-worker mood-redis 2>/dev/null || true
-          docker rm mood-classifier mood-arq-worker mood-redis 2>/dev/null || true
-          docker-compose down --remove-orphans 2>/dev/null || true
+          # Run graceful deployment (waits for queue drain, health checks)
+          chmod +x scripts/graceful-deploy.sh
+          TIMEOUT_MINUTES=5 HEALTH_CHECK_RETRIES=30 ./scripts/graceful-deploy.sh
 
-          # Pull and start services
-          docker-compose pull
-          docker-compose up -d
-
-          # Wait for services to start
-          sleep 5
-          docker-compose ps
+          # Show final logs
+          echo ""
+          echo "📋 Recent logs:"
           docker-compose logs --tail=20 bot
+          docker-compose logs --tail=20 worker
 
           # Cleanup
           rm -f .env
           docker logout ${{ env.REGISTRY }}
-          echo "✓ Deployed with docker-compose"
+          echo "✓ Graceful deployment completed"
 
   # ============================================
   # JOB 6: Cleanup

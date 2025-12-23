@@ -29,6 +29,9 @@ function flatten_log(tag, timestamp, record)
         if log["correlation_id"] then
             record["correlation_id"] = log["correlation_id"]
         end
+        if log["data"] then
+            record["data"] = log["data"]
+        end
     end
 
     -- Clean up parser-extracted fields (avoid duplicates)
@@ -36,6 +39,7 @@ function flatten_log(tag, timestamp, record)
     record["component"] = nil
     record["logger"] = nil
     record["timestamp"] = nil
+    record["message"] = nil
 
     return 2, timestamp, record
 end
