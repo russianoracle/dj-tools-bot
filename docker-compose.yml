@@ -74,6 +74,7 @@ services:
       # Infrastructure
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ARQ_MAX_JOBS=${ARQ_MAX_JOBS:-2}
       - DATA_DIR=/data
       - DOWNLOADS_DIR=/data/downloads
       # Logging

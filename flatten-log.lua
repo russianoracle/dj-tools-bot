@@ -2,12 +2,31 @@
 function flatten_log(tag, timestamp, record)
     local log = record["log"]
 
+    -- If log is empty or nil, set default message
+    if not log or (type(log) == "string" and log:match("^%s*$")) then
+        record["log"] = "[Empty log]"
+        record["log_level"] = "INFO"
+        return 2, timestamp, record
+    end
+
     -- If log is a map/table with nested fields, flatten it
     if type(log) == "table" then
         -- Extract nested fields from parsed JSON
+        local message_extracted = false
+
         if log["message"] then
-            record["log"] = log["message"]
+            -- Ensure message is string, not table
+            if type(log["message"]) == "string" then
+                record["log"] = log["message"]
+                message_extracted = true
+            elseif type(log["message"]) == "table" then
+                -- Convert table to JSON string
+                local json = require("cjson")
+                record["log"] = json.encode(log["message"])
+                message_extracted = true
+            end
         end
+
         if log["level"] then
             record["log_level"] = log["level"]
         end
@@ -32,6 +51,22 @@ function flatten_log(tag, timestamp, record)
         if log["data"] then
             record["data"] = log["data"]
         end
+
+        -- Fallback: if message wasn't extracted, convert entire table to JSON
+        if not message_extracted then
+            local json = require("cjson")
+            record["log"] = json.encode(log)
+        end
+    end
+
+    -- Ensure log field is always a string
+    if type(record["log"]) ~= "string" then
+        record["log"] = "[Malformed log entry]"
+    end
+
+    -- Set default log level if missing
+    if not record["log_level"] or record["log_level"] == "" then
+        record["log_level"] = "INFO"
     end
 
     -- Clean up parser-extracted fields (avoid duplicates)
