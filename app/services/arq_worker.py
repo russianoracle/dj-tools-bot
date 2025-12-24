@@ -681,8 +681,8 @@ class WorkerSettings:
     # Worker startup hook
     on_startup = startup
 
-    # Allow 2 concurrent jobs
-    max_jobs = 2
+    # Allow N concurrent jobs (configurable via ARQ_MAX_JOBS env)
+    max_jobs = int(os.getenv("ARQ_MAX_JOBS", "2"))
 
     # Long timeouts for 2+ hour DJ sets
     job_timeout = 7200          # 2 hours max per job (increased from 1h)

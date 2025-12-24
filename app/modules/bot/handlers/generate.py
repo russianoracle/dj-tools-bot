@@ -80,7 +80,7 @@ async def cb_generate_duration(callback: CallbackQuery):
         dj_name = f"user_{user_id}"
 
         # Generate set plan
-        generator = SetGeneratorPipeline(cache_dir="cache")
+        generator = SetGeneratorPipeline()
         plan = generator.generate_plan(
             dj_name=dj_name,
             target_duration_min=duration,
