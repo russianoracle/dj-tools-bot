@@ -42,7 +42,7 @@ psutil>=5.9.0  # Required for healthcheck_worker.py
 # Yandex Cloud SDK (Monitoring, Logging)
 yandexcloud>=0.298.0
 
-# Monitoring
+# Monitoring (required for business metrics)
 prometheus-client>=0.20.0
 
 # ============================================================================
