@@ -30,7 +30,7 @@ def sample_audio():
 @pytest.fixture
 def stft_cache(sample_audio):
     """Create STFTCache from sample audio."""
-    from src.core.primitives.stft import compute_stft
+    from app.core.primitives.stft import compute_stft
 
     y, sr = sample_audio
     return compute_stft(y, sr=sr)
@@ -41,7 +41,7 @@ class TestSTFTCacheCreation:
 
     def test_compute_stft_returns_cache(self, sample_audio):
         """compute_stft should return STFTCache object."""
-        from src.core.primitives.stft import compute_stft, STFTCache
+        from app.core.primitives.stft import compute_stft, STFTCache
 
         y, sr = sample_audio
         cache = compute_stft(y, sr=sr)

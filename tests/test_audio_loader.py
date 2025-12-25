@@ -481,7 +481,7 @@ class TestAudioSaver:
     @pytest.fixture
     def saver(self):
         """Default AudioSaver instance."""
-        from src.audio.loader import AudioSaver
+        from app.audio.loader import AudioSaver
         return AudioSaver(sample_rate=48000)
 
     @pytest.fixture
@@ -598,7 +598,7 @@ class TestSaveAudioFunction:
 
     def test_save_audio_opus(self):
         """save_audio function works for OPUS."""
-        from src.audio.loader import save_audio
+        from app.audio.loader import save_audio
 
         # Create test audio
         sr = 48000

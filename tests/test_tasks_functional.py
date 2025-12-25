@@ -50,7 +50,7 @@ def sample_audio():
 @pytest.fixture
 def audio_context(sample_audio):
     """Create AudioContext from sample audio."""
-    from src.core.tasks.base import create_audio_context
+    from app.core.tasks.base import create_audio_context
 
     y, sr = sample_audio
     return create_audio_context(y, sr=sr)
@@ -61,7 +61,7 @@ class TestFeatureExtractionTask:
 
     def test_feature_extraction_runs(self, audio_context):
         """Feature extraction should complete without error."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -71,7 +71,7 @@ class TestFeatureExtractionTask:
 
     def test_feature_count(self, audio_context):
         """Should extract expected number of features (79)."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask, FEATURE_NAMES
+        from app.core.tasks.feature_extraction import FeatureExtractionTask, FEATURE_NAMES
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -81,7 +81,7 @@ class TestFeatureExtractionTask:
 
     def test_to_vector_shape(self, audio_context):
         """to_vector should return correct shape."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask, FEATURE_NAMES
+        from app.core.tasks.feature_extraction import FeatureExtractionTask, FEATURE_NAMES
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -91,7 +91,7 @@ class TestFeatureExtractionTask:
 
     def test_mfcc_features_present(self, audio_context):
         """MFCC features should be extracted."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -103,7 +103,7 @@ class TestFeatureExtractionTask:
 
     def test_chroma_features_present(self, audio_context):
         """Chroma features should be extracted."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -114,7 +114,7 @@ class TestFeatureExtractionTask:
 
     def test_tonnetz_features_present(self, audio_context):
         """Tonnetz features should be extracted."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -124,7 +124,7 @@ class TestFeatureExtractionTask:
 
     def test_energy_features_reasonable(self, audio_context):
         """Energy features should have reasonable values."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -137,7 +137,7 @@ class TestFeatureExtractionTask:
 
     def test_spectral_features_reasonable(self, audio_context):
         """Spectral features should have reasonable values."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -154,7 +154,7 @@ class TestSegmentationTask:
 
     def test_segmentation_runs(self, audio_context):
         """Segmentation should complete without error."""
-        from src.core.tasks.segmentation import SegmentationTask
+        from app.core.tasks.segmentation import SegmentationTask
 
         task = SegmentationTask()
         result = task.execute(audio_context)
@@ -163,7 +163,7 @@ class TestSegmentationTask:
 
     def test_segments_cover_audio(self, audio_context):
         """Segment boundaries should span the audio."""
-        from src.core.tasks.segmentation import SegmentationTask
+        from app.core.tasks.segmentation import SegmentationTask
 
         task = SegmentationTask()
         result = task.execute(audio_context)
@@ -177,7 +177,7 @@ class TestSegmentationTask:
 
     def test_boundaries_in_order(self, audio_context):
         """Boundaries should be in chronological order."""
-        from src.core.tasks.segmentation import SegmentationTask
+        from app.core.tasks.segmentation import SegmentationTask
 
         task = SegmentationTask()
         result = task.execute(audio_context)
@@ -195,7 +195,7 @@ class TestDropDetectionTask:
 
     def test_drop_detection_runs(self, audio_context):
         """Drop detection should complete without error."""
-        from src.core.tasks.drop_detection import DropDetectionTask
+        from app.core.tasks.drop_detection import DropDetectionTask
 
         task = DropDetectionTask()
         result = task.execute(audio_context)
@@ -204,7 +204,7 @@ class TestDropDetectionTask:
 
     def test_drops_have_required_fields(self, audio_context):
         """Each drop should have required fields."""
-        from src.core.tasks.drop_detection import DropDetectionTask
+        from app.core.tasks.drop_detection import DropDetectionTask
 
         task = DropDetectionTask()
         result = task.execute(audio_context)
@@ -217,7 +217,7 @@ class TestDropDetectionTask:
 
     def test_drops_within_audio_duration(self, audio_context):
         """All drops should be within audio duration."""
-        from src.core.tasks.drop_detection import DropDetectionTask
+        from app.core.tasks.drop_detection import DropDetectionTask
 
         task = DropDetectionTask()
         result = task.execute(audio_context)
@@ -231,7 +231,7 @@ class TestTransitionDetectionTask:
 
     def test_transition_detection_runs(self, audio_context):
         """Transition detection should complete without error."""
-        from src.core.tasks.transition_detection import TransitionDetectionTask
+        from app.core.tasks.transition_detection import TransitionDetectionTask
 
         task = TransitionDetectionTask()
         result = task.execute(audio_context)
@@ -240,7 +240,7 @@ class TestTransitionDetectionTask:
 
     def test_mixins_within_duration(self, audio_context):
         """All mixins should be within audio duration."""
-        from src.core.tasks.transition_detection import TransitionDetectionTask
+        from app.core.tasks.transition_detection import TransitionDetectionTask
 
         task = TransitionDetectionTask()
         result = task.execute(audio_context)
@@ -250,7 +250,7 @@ class TestTransitionDetectionTask:
 
     def test_mixouts_within_duration(self, audio_context):
         """All mixouts should be within audio duration."""
-        from src.core.tasks.transition_detection import TransitionDetectionTask
+        from app.core.tasks.transition_detection import TransitionDetectionTask
 
         task = TransitionDetectionTask()
         result = task.execute(audio_context)
@@ -264,7 +264,7 @@ class TestSTFTCacheIntegration:
 
     def test_stft_cache_populated_after_feature_extraction(self, audio_context):
         """Feature extraction should populate STFTCache."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         # Record initial cache size (may contain _y for lazy audio access)
         initial_cache_size = len(audio_context.stft_cache._feature_cache)
@@ -277,8 +277,8 @@ class TestSTFTCacheIntegration:
 
     def test_stft_cache_reused_between_tasks(self, audio_context):
         """Multiple tasks should reuse cached features."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
-        from src.core.tasks.segmentation import SegmentationTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.segmentation import SegmentationTask
 
         # Run feature extraction first
         feat_task = FeatureExtractionTask()
@@ -301,8 +301,8 @@ class TestFeatureConsistency:
 
     def test_feature_extraction_deterministic(self, sample_audio):
         """Feature extraction should produce same results."""
-        from src.core.tasks.base import create_audio_context
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.base import create_audio_context
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         y, sr = sample_audio
 
@@ -327,8 +327,8 @@ class TestTaskErrorHandling:
 
     def test_feature_extraction_handles_short_audio(self):
         """Feature extraction should handle very short audio."""
-        from src.core.tasks.base import create_audio_context
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.base import create_audio_context
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         # Very short audio (0.5 seconds)
         sr = 22050
@@ -344,8 +344,8 @@ class TestTaskErrorHandling:
 
     def test_feature_extraction_handles_silence(self):
         """Feature extraction should handle silent audio."""
-        from src.core.tasks.base import create_audio_context
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.base import create_audio_context
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         # Silent audio
         sr = 22050

@@ -426,7 +426,7 @@ class TestCalibrateGridPhase:
 
     def test_calibration_returns_result(self, sample_beat_grid):
         """calibrate_grid_phase returns GridCalibrationResult."""
-        from src.core.primitives.beat_grid import GridCalibrationResult
+        from app.core.primitives.beat_grid import GridCalibrationResult
 
         events = np.array([7.5, 15.0], dtype=np.float32)
         result = calibrate_grid_phase(sample_beat_grid, events)

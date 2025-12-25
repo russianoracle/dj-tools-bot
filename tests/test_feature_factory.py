@@ -40,7 +40,7 @@ def test_audio():
 @pytest.fixture(scope="module")
 def factory(test_audio):
     """Create FeatureFactory from test audio."""
-    from src.core.feature_factory import FeatureFactory
+    from app.core.feature_factory import FeatureFactory
 
     y, sr = test_audio
     return FeatureFactory.from_audio(y, sr)
@@ -51,7 +51,7 @@ class TestFeatureFactoryCreation:
 
     def test_from_audio(self, test_audio):
         """Factory should be created from raw audio."""
-        from src.core.feature_factory import FeatureFactory
+        from app.core.feature_factory import FeatureFactory
 
         y, sr = test_audio
         factory = FeatureFactory.from_audio(y, sr)
@@ -62,8 +62,8 @@ class TestFeatureFactoryCreation:
 
     def test_from_stft_cache(self, test_audio):
         """Factory should be created from existing STFTCache."""
-        from src.core.feature_factory import FeatureFactory
-        from src.core.primitives.stft import compute_stft
+        from app.core.feature_factory import FeatureFactory
+        from app.core.primitives.stft import compute_stft
 
         y, sr = test_audio
         cache = compute_stft(y, sr=sr)
@@ -74,7 +74,7 @@ class TestFeatureFactoryCreation:
 
     def test_convenience_function(self, test_audio):
         """create_factory() convenience function should work."""
-        from src.core.feature_factory import create_factory
+        from app.core.feature_factory import create_factory
 
         y, sr = test_audio
         factory = create_factory(y, sr)
@@ -352,7 +352,7 @@ class TestExtractFeaturesFunction:
 
     def test_extract_features(self, test_audio):
         """extract_features() should return dictionary."""
-        from src.core.feature_factory import extract_features
+        from app.core.feature_factory import extract_features
 
         y, sr = test_audio
         features = extract_features(y, sr)
@@ -367,8 +367,8 @@ class TestConsistencyWithPrimitives:
 
     def test_rms_matches_primitive(self, test_audio):
         """Factory RMS should match STFTCache.get_rms()."""
-        from src.core.feature_factory import FeatureFactory
-        from src.core.primitives import compute_stft
+        from app.core.feature_factory import FeatureFactory
+        from app.core.primitives import compute_stft
 
         y, sr = test_audio
 
@@ -384,8 +384,8 @@ class TestConsistencyWithPrimitives:
 
     def test_mfcc_matches_stft_cache(self, test_audio):
         """Factory MFCC should match STFTCache.get_mfcc()."""
-        from src.core.feature_factory import FeatureFactory
-        from src.core.primitives import compute_stft
+        from app.core.feature_factory import FeatureFactory
+        from app.core.primitives import compute_stft
 
         y, sr = test_audio
 

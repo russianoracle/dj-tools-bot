@@ -79,7 +79,7 @@ def loaded_audio(test_audio_path) -> Tuple[np.ndarray, int]:
 @pytest.fixture(scope="module")
 def stft_cache(loaded_audio):
     """Create STFTCache from loaded audio."""
-    from src.core.primitives.stft import compute_stft
+    from app.core.primitives.stft import compute_stft
 
     y, sr = loaded_audio
     return compute_stft(y, sr=sr)
@@ -276,7 +276,7 @@ class TestPrimitivesMatchLibrosa:
 
     def test_compute_rms_matches(self, stft_cache, librosa_baseline):
         """primitives.compute_rms() should match librosa.feature.rms()."""
-        from src.core.primitives.energy import compute_rms
+        from app.core.primitives.energy import compute_rms
 
         prim_rms = compute_rms(stft_cache.S)
         librosa_rms = librosa_baseline['rms']
@@ -288,7 +288,7 @@ class TestPrimitivesMatchLibrosa:
 
     def test_compute_centroid_matches(self, stft_cache, librosa_baseline):
         """primitives.compute_centroid() should match librosa.feature.spectral_centroid()."""
-        from src.core.primitives.spectral import compute_centroid
+        from app.core.primitives.spectral import compute_centroid
 
         prim_centroid = compute_centroid(stft_cache.S, stft_cache.freqs)
         librosa_centroid = librosa_baseline['spectral_centroid']
@@ -300,7 +300,7 @@ class TestPrimitivesMatchLibrosa:
 
     def test_compute_rolloff_matches(self, stft_cache, librosa_baseline):
         """primitives.compute_rolloff() should match librosa.feature.spectral_rolloff()."""
-        from src.core.primitives.spectral import compute_rolloff
+        from app.core.primitives.spectral import compute_rolloff
 
         prim_rolloff = compute_rolloff(stft_cache.S, stft_cache.freqs, roll_percent=0.85)
         librosa_rolloff = librosa_baseline['spectral_rolloff']
@@ -313,7 +313,7 @@ class TestPrimitivesMatchLibrosa:
 
     def test_compute_flatness_matches(self, stft_cache, librosa_baseline):
         """primitives.compute_flatness() should match librosa.feature.spectral_flatness()."""
-        from src.core.primitives.spectral import compute_flatness
+        from app.core.primitives.spectral import compute_flatness
 
         prim_flatness = compute_flatness(stft_cache.S)
         librosa_flatness = librosa_baseline['spectral_flatness']
@@ -325,7 +325,7 @@ class TestPrimitivesMatchLibrosa:
 
     def test_compute_bandwidth_matches(self, stft_cache, librosa_baseline):
         """primitives.compute_bandwidth() should match librosa.feature.spectral_bandwidth()."""
-        from src.core.primitives.spectral import compute_bandwidth, compute_centroid
+        from app.core.primitives.spectral import compute_bandwidth, compute_centroid
 
         centroid = compute_centroid(stft_cache.S, stft_cache.freqs)
         prim_bandwidth = compute_bandwidth(stft_cache.S, stft_cache.freqs, centroid)
@@ -338,7 +338,7 @@ class TestPrimitivesMatchLibrosa:
 
     def test_compute_onset_strength_matches(self, stft_cache, librosa_baseline):
         """primitives.compute_onset_strength() should match librosa.onset.onset_strength()."""
-        from src.core.primitives.rhythm import compute_onset_strength
+        from app.core.primitives.rhythm import compute_onset_strength
 
         prim_onset = compute_onset_strength(
             stft_cache.S, stft_cache.sr, stft_cache.hop_length
@@ -414,7 +414,7 @@ class TestDataLayerConsumers:
     def test_unified_features_frame_extraction(self, loaded_audio):
         """UnifiedFeatureExtractor frame extraction should work."""
         try:
-            from src.data.unified_features import UnifiedFeatureExtractor
+            from app.data.unified_features import UnifiedFeatureExtractor
         except ImportError:
             pytest.skip("UnifiedFeatureExtractor not importable")
 
@@ -447,7 +447,7 @@ class TestAnalysisUtilsConsumers:
     def test_audio_analyzer_spectral_features(self, loaded_audio):
         """AudioAnalyzer should compute spectral features."""
         try:
-            from src.audio.analysis_utils import AudioAnalyzer
+            from app.audio.analysis_utils import AudioAnalyzer
         except ImportError:
             pytest.skip("AudioAnalyzer not importable")
 
@@ -477,7 +477,7 @@ class TestMixinMixoutConsumers:
     def test_transition_analyzer_import(self):
         """TransitionAnalyzer should be importable."""
         try:
-            from src.audio.mixin_mixout import TransitionAnalyzer
+            from app.audio.mixin_mixout import TransitionAnalyzer
             assert TransitionAnalyzer is not None
         except ImportError as e:
             pytest.skip(f"TransitionAnalyzer not importable: {e}")
@@ -518,11 +518,11 @@ class TestGoldenOutputs:
 
     def test_primitives_golden_hashes(self, stft_cache):
         """Record golden hashes for primitives."""
-        from src.core.primitives.energy import compute_rms
-        from src.core.primitives.spectral import (
+        from app.core.primitives.energy import compute_rms
+        from app.core.primitives.spectral import (
             compute_centroid, compute_rolloff, compute_flatness
         )
-        from src.core.primitives.rhythm import compute_onset_strength
+        from app.core.primitives.rhythm import compute_onset_strength
 
         golden_hashes = {
             'rms_hash': self._feature_hash(compute_rms(stft_cache.S)),
@@ -555,7 +555,7 @@ class TestRhythmPrimitivesMatchLibrosa:
 
     def test_compute_tempo_reasonable(self, stft_cache):
         """compute_tempo should return reasonable tempo."""
-        from src.core.primitives.rhythm import compute_onset_strength, compute_tempo
+        from app.core.primitives.rhythm import compute_onset_strength, compute_tempo
 
         onset_env = compute_onset_strength(
             stft_cache.S, stft_cache.sr, stft_cache.hop_length
@@ -569,8 +569,8 @@ class TestRhythmPrimitivesMatchLibrosa:
 
     def test_compute_tempo_matches_librosa(self, loaded_audio, librosa_baseline):
         """compute_tempo should be close to librosa.beat.beat_track."""
-        from src.core.primitives.rhythm import compute_onset_strength, compute_tempo
-        from src.core.primitives.stft import compute_stft
+        from app.core.primitives.rhythm import compute_onset_strength, compute_tempo
+        from app.core.primitives.stft import compute_stft
 
         y, sr = loaded_audio
         cache = compute_stft(y, sr=sr)
@@ -599,8 +599,8 @@ class TestShapeConsistency:
 
     def test_all_features_same_n_frames(self, stft_cache):
         """All frame-based features should have same n_frames."""
-        from src.core.primitives.energy import compute_rms
-        from src.core.primitives.spectral import compute_centroid
+        from app.core.primitives.energy import compute_rms
+        from app.core.primitives.spectral import compute_centroid
 
         n_frames = stft_cache.n_frames
 

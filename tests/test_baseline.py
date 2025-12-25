@@ -50,7 +50,7 @@ class TestSTFTCacheBaseline:
 
     def test_stft_cache_deterministic(self, synthetic_audio):
         """STFTCache should produce identical results on same input."""
-        from src.core.primitives import compute_stft
+        from app.core.primitives import compute_stft
 
         y, sr = synthetic_audio
 
@@ -64,7 +64,7 @@ class TestSTFTCacheBaseline:
 
     def test_stft_cache_rms_consistent(self, synthetic_audio):
         """RMS from STFTCache should be consistent."""
-        from src.core.primitives import compute_stft
+        from app.core.primitives import compute_stft
 
         y, sr = synthetic_audio
         cache = compute_stft(y, sr=sr)
@@ -83,7 +83,7 @@ class TestSTFTCacheBaseline:
 
     def test_stft_cache_mfcc_consistent(self, synthetic_audio):
         """MFCC from STFTCache should be consistent."""
-        from src.core.primitives import compute_stft
+        from app.core.primitives import compute_stft
 
         y, sr = synthetic_audio
         cache = compute_stft(y, sr=sr)
@@ -100,7 +100,7 @@ class TestSTFTCacheBaseline:
 
     def test_stft_cache_spectral_features_consistent(self, synthetic_audio):
         """Spectral features from STFTCache should be consistent."""
-        from src.core.primitives import compute_stft
+        from app.core.primitives import compute_stft
 
         y, sr = synthetic_audio
         cache = compute_stft(y, sr=sr)
@@ -125,7 +125,7 @@ class TestSTFTCacheBaseline:
 
     def test_onset_strength_consistent(self, synthetic_audio):
         """Onset strength should be consistent."""
-        from src.core.primitives import compute_stft
+        from app.core.primitives import compute_stft
 
         y, sr = synthetic_audio
         cache = compute_stft(y, sr=sr)
@@ -143,8 +143,8 @@ class TestFeatureExtractionBaseline:
     @pytest.fixture
     def audio_context(self):
         """Create AudioContext with synthetic audio."""
-        from src.core.tasks.base import AudioContext
-        from src.core.primitives import compute_stft
+        from app.core.tasks.base import AudioContext
+        from app.core.primitives import compute_stft
 
         np.random.seed(42)
         sr = 22050
@@ -171,7 +171,7 @@ class TestFeatureExtractionBaseline:
 
     def test_feature_extraction_79_features(self, audio_context):
         """FeatureExtractionTask should produce 79 features."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask, FEATURE_NAMES
+        from app.core.tasks.feature_extraction import FeatureExtractionTask, FEATURE_NAMES
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -185,7 +185,7 @@ class TestFeatureExtractionBaseline:
 
     def test_feature_vector_shape(self, audio_context):
         """Feature vector should have correct shape."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -196,7 +196,7 @@ class TestFeatureExtractionBaseline:
 
     def test_feature_values_finite(self, audio_context):
         """All features should be finite values."""
-        from src.core.tasks.feature_extraction import FeatureExtractionTask
+        from app.core.tasks.feature_extraction import FeatureExtractionTask
 
         task = FeatureExtractionTask()
         result = task.execute(audio_context)
@@ -211,8 +211,8 @@ class TestTasksUseSTFTCache:
     @pytest.fixture
     def audio_context(self):
         """Create AudioContext."""
-        from src.core.tasks.base import AudioContext
-        from src.core.primitives import compute_stft
+        from app.core.tasks.base import AudioContext
+        from app.core.primitives import compute_stft
 
         np.random.seed(42)
         sr = 22050
@@ -229,7 +229,7 @@ class TestTasksUseSTFTCache:
 
     def test_drop_detection_uses_cache(self, audio_context):
         """DropDetectionTask should use STFTCache.get_rms()."""
-        from src.core.tasks.drop_detection import DropDetectionTask
+        from app.core.tasks.drop_detection import DropDetectionTask
 
         # Record initial cache state
         initial_cache_size = len(audio_context.stft_cache._feature_cache)
@@ -245,7 +245,7 @@ class TestTasksUseSTFTCache:
 
     def test_transition_detection_uses_cache(self, audio_context):
         """TransitionDetectionTask should use STFTCache methods."""
-        from src.core.tasks.transition_detection import TransitionDetectionTask
+        from app.core.tasks.transition_detection import TransitionDetectionTask
 
         task = TransitionDetectionTask()
         result = task.execute(audio_context)
@@ -265,26 +265,26 @@ class TestBlockedImports:
     def test_compute_rms_blocked(self):
         """compute_rms should raise ImportError."""
         with pytest.raises(ImportError, match="BLOCKED"):
-            from src.core.primitives import compute_rms
+            from app.core.primitives import compute_rms
 
     def test_compute_centroid_blocked(self):
         """compute_centroid should raise ImportError."""
         with pytest.raises(ImportError, match="BLOCKED"):
-            from src.core.primitives import compute_centroid
+            from app.core.primitives import compute_centroid
 
     def test_compute_onset_strength_blocked(self):
         """compute_onset_strength should raise ImportError."""
         with pytest.raises(ImportError, match="BLOCKED"):
-            from src.core.primitives import compute_onset_strength
+            from app.core.primitives import compute_onset_strength
 
     def test_compute_mfcc_blocked(self):
         """compute_mfcc should raise ImportError."""
         with pytest.raises(ImportError, match="BLOCKED"):
-            from src.core.primitives import compute_mfcc
+            from app.core.primitives import compute_mfcc
 
     def test_allowed_imports_work(self):
         """Allowed imports should work without error."""
-        from src.core.primitives import (
+        from app.core.primitives import (
             compute_stft,
             STFTCache,
             smooth_gaussian,

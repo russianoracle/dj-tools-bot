@@ -1,7 +1,7 @@
 """
 Pytest configuration for mood-classifier tests.
 
-Automatically adds project root to sys.path so that 'from src...' imports work.
+Automatically adds project root to sys.path so that 'from app...' imports work.
 Defines markers and shared fixtures.
 """
 import sys

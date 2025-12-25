@@ -107,7 +107,7 @@ class TestInvariantFloat32Contiguous:
     @pytest.fixture
     def stft_cache(self):
         """Create STFTCache for testing."""
-        from src.core.primitives.stft import compute_stft
+        from app.core.primitives.stft import compute_stft
 
         sr = 22050
         y = np.sin(2 * np.pi * 440 * np.arange(sr * 2) / sr).astype(np.float32)
@@ -144,7 +144,7 @@ class TestInvariantFloat32Contiguous:
 
     def test_beat_grid_boundaries_float32(self):
         """BeatGrid boundaries must be float32."""
-        from src.core.primitives.beat_grid import BeatGridResult, BeatInfo, BarInfo, PhraseInfo
+        from app.core.primitives.beat_grid import BeatGridResult, BeatInfo, BarInfo, PhraseInfo
 
         grid = BeatGridResult(
             beats=[BeatInfo(0.0, 0, 1, 1, 1.0)],
@@ -213,7 +213,7 @@ class TestInvariantCacheAPI:
     def test_cache_repository_singleton(self):
         """CacheRepository.get_instance() returns same object."""
         import tempfile
-        from src.core.cache import CacheRepository
+        from app.core.cache import CacheRepository
 
         with tempfile.TemporaryDirectory() as tmpdir:
             CacheRepository._instance = None
@@ -225,7 +225,7 @@ class TestInvariantCacheAPI:
 
     def test_cache_manager_not_in_public_exports(self):
         """CacheManager should not be in __all__ of cache module."""
-        from src.core import cache
+        from app.core import cache
 
         if hasattr(cache, '__all__'):
             assert 'CacheManager' not in cache.__all__, (
@@ -244,7 +244,7 @@ class TestInvariantBeatGridHierarchy:
     @pytest.fixture
     def synthetic_spectrogram(self):
         """Create synthetic spectrogram for testing."""
-        from src.core.primitives.stft import compute_stft
+        from app.core.primitives.stft import compute_stft
 
         sr = 22050
         duration = 30.0  # 30 seconds for multiple phrases
@@ -268,7 +268,7 @@ class TestInvariantBeatGridHierarchy:
 
     def test_4_beats_per_bar(self, synthetic_spectrogram):
         """Each bar must have 4 beats."""
-        from src.core.primitives.beat_grid import compute_beat_grid
+        from app.core.primitives.beat_grid import compute_beat_grid
 
         S, sr, hop = synthetic_spectrogram
         grid = compute_beat_grid(S, sr, hop)
@@ -281,7 +281,7 @@ class TestInvariantBeatGridHierarchy:
 
     def test_4_bars_per_phrase(self, synthetic_spectrogram):
         """Each phrase must have 4 bars."""
-        from src.core.primitives.beat_grid import compute_beat_grid
+        from app.core.primitives.beat_grid import compute_beat_grid
 
         S, sr, hop = synthetic_spectrogram
         grid = compute_beat_grid(S, sr, hop)
@@ -294,7 +294,7 @@ class TestInvariantBeatGridHierarchy:
 
     def test_bar_position_1_to_4(self, synthetic_spectrogram):
         """Beat bar_position must be 1-4."""
-        from src.core.primitives.beat_grid import compute_beat_grid
+        from app.core.primitives.beat_grid import compute_beat_grid
 
         S, sr, hop = synthetic_spectrogram
         grid = compute_beat_grid(S, sr, hop)
@@ -306,7 +306,7 @@ class TestInvariantBeatGridHierarchy:
 
     def test_phrase_position_1_to_16(self, synthetic_spectrogram):
         """Beat phrase_position must be 1-16."""
-        from src.core.primitives.beat_grid import compute_beat_grid
+        from app.core.primitives.beat_grid import compute_beat_grid
 
         S, sr, hop = synthetic_spectrogram
         grid = compute_beat_grid(S, sr, hop)

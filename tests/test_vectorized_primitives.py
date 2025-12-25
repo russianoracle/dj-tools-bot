@@ -22,7 +22,7 @@ class TestSpectralContrast:
 
     def test_output_shape(self):
         """Output should be (n_bands, n_frames)"""
-        from src.core.primitives.spectral import compute_contrast
+        from app.core.primitives.spectral import compute_contrast
 
         S = np.random.rand(513, 100).astype(np.float32)
         freqs = np.linspace(0, 11025, 513)
@@ -34,7 +34,7 @@ class TestSpectralContrast:
 
     def test_output_values_range(self):
         """Contrast values should be non-negative (log ratio)"""
-        from src.core.primitives.spectral import compute_contrast
+        from app.core.primitives.spectral import compute_contrast
 
         S = np.random.rand(513, 100).astype(np.float32) + 0.1  # Avoid zeros
         freqs = np.linspace(0, 11025, 513)
@@ -47,7 +47,7 @@ class TestSpectralContrast:
 
     def test_empty_bands(self):
         """Handle case where some frequency bands are empty"""
-        from src.core.primitives.spectral import compute_contrast
+        from app.core.primitives.spectral import compute_contrast
 
         S = np.random.rand(10, 100).astype(np.float32)
         freqs = np.linspace(0, 500, 10)  # Very narrow frequency range
@@ -63,7 +63,7 @@ class TestDynamicsNMS:
 
     def test_nms_removes_nearby_lower_confidence(self):
         """NMS should keep higher confidence candidates"""
-        from src.core.primitives.dynamics import detect_drop_candidates
+        from app.core.primitives.dynamics import detect_drop_candidates
 
         # Create synthetic RMS with clear drops
         n_frames = 1000
@@ -82,7 +82,7 @@ class TestDynamicsNMS:
 
     def test_empty_candidates(self):
         """Handle case with no drop candidates"""
-        from src.core.primitives.dynamics import detect_drop_candidates
+        from app.core.primitives.dynamics import detect_drop_candidates
 
         # Flat RMS - no drops
         rms = np.ones(1000, dtype=np.float32) * 0.5
@@ -97,7 +97,7 @@ class TestTimbraNovelty:
 
     def test_output_shape(self):
         """Output should match input frames"""
-        from src.core.primitives.dynamics import compute_timbral_novelty
+        from app.core.primitives.dynamics import compute_timbral_novelty
 
         mfcc = np.random.rand(13, 1000).astype(np.float32)
 
@@ -107,7 +107,7 @@ class TestTimbraNovelty:
 
     def test_output_normalized(self):
         """Output should be normalized 0-1"""
-        from src.core.primitives.dynamics import compute_timbral_novelty
+        from app.core.primitives.dynamics import compute_timbral_novelty
 
         mfcc = np.random.rand(13, 1000).astype(np.float32)
 
@@ -118,7 +118,7 @@ class TestTimbraNovelty:
 
     def test_short_input(self):
         """Handle short inputs gracefully"""
-        from src.core.primitives.dynamics import compute_timbral_novelty
+        from app.core.primitives.dynamics import compute_timbral_novelty
 
         mfcc = np.random.rand(13, 10).astype(np.float32)
 
@@ -133,7 +133,7 @@ class TestBeatSyncMask:
 
     def test_output_shape(self):
         """Output should be boolean mask of n_frames"""
-        from src.core.primitives.rhythm import compute_beat_sync_mask
+        from app.core.primitives.rhythm import compute_beat_sync_mask
 
         mask = compute_beat_sync_mask(100, np.array([10, 20, 30]), tolerance=2)
 
@@ -142,7 +142,7 @@ class TestBeatSyncMask:
 
     def test_beats_marked_true(self):
         """Beat positions should be True"""
-        from src.core.primitives.rhythm import compute_beat_sync_mask
+        from app.core.primitives.rhythm import compute_beat_sync_mask
 
         beats = np.array([10, 20, 30])
         mask = compute_beat_sync_mask(100, beats, tolerance=2)
@@ -153,7 +153,7 @@ class TestBeatSyncMask:
 
     def test_tolerance_applied(self):
         """Frames within tolerance should be True"""
-        from src.core.primitives.rhythm import compute_beat_sync_mask
+        from app.core.primitives.rhythm import compute_beat_sync_mask
 
         beats = np.array([50])
         mask = compute_beat_sync_mask(100, beats, tolerance=3)
@@ -166,7 +166,7 @@ class TestBeatSyncMask:
 
     def test_empty_beats(self):
         """Handle empty beat array"""
-        from src.core.primitives.rhythm import compute_beat_sync_mask
+        from app.core.primitives.rhythm import compute_beat_sync_mask
 
         mask = compute_beat_sync_mask(100, np.array([]), tolerance=2)
 
@@ -179,7 +179,7 @@ class TestDropConflictScore:
 
     def test_no_conflicts(self):
         """Score should be 1.0 when no drops in mix zone"""
-        from src.core.primitives.transition_scoring import score_drop_conflict
+        from app.core.primitives.transition_scoring import score_drop_conflict
 
         # Drops far from mix zone
         drops_a = [50.0, 100.0]  # Far from end (200)
@@ -191,7 +191,7 @@ class TestDropConflictScore:
 
     def test_one_conflict(self):
         """Score should be 0.7 with one conflict"""
-        from src.core.primitives.transition_scoring import score_drop_conflict
+        from app.core.primitives.transition_scoring import score_drop_conflict
 
         # One drop in A's outro
         drops_a = [50.0, 180.0]  # 180 is 20 sec from end (in mix zone)
@@ -203,7 +203,7 @@ class TestDropConflictScore:
 
     def test_empty_drops(self):
         """Handle empty drop lists"""
-        from src.core.primitives.transition_scoring import score_drop_conflict
+        from app.core.primitives.transition_scoring import score_drop_conflict
 
         score = score_drop_conflict([], [], 200.0, 300.0, mix_zone_sec=32.0)
 
@@ -215,7 +215,7 @@ class TestResampleFeatures:
 
     def test_output_shape_1d(self):
         """1D resample should change last dimension"""
-        from src.core.primitives.filtering import resample_features
+        from app.core.primitives.filtering import resample_features
 
         x = np.random.rand(100).astype(np.float32)
 
@@ -225,7 +225,7 @@ class TestResampleFeatures:
 
     def test_output_shape_2d(self):
         """2D resample should change time dimension"""
-        from src.core.primitives.filtering import resample_features
+        from app.core.primitives.filtering import resample_features
 
         x = np.random.rand(13, 100).astype(np.float32)
 
@@ -235,7 +235,7 @@ class TestResampleFeatures:
 
     def test_output_shape_3d(self):
         """3D resample should change time dimension"""
-        from src.core.primitives.filtering import resample_features
+        from app.core.primitives.filtering import resample_features
 
         x = np.random.rand(4, 13, 100).astype(np.float32)
 
@@ -245,7 +245,7 @@ class TestResampleFeatures:
 
     def test_identity(self):
         """Same target frames should return input"""
-        from src.core.primitives.filtering import resample_features
+        from app.core.primitives.filtering import resample_features
 
         x = np.random.rand(13, 100).astype(np.float32)
 
@@ -255,7 +255,7 @@ class TestResampleFeatures:
 
     def test_upsample(self):
         """Upsampling should work"""
-        from src.core.primitives.filtering import resample_features
+        from app.core.primitives.filtering import resample_features
 
         x = np.random.rand(13, 50).astype(np.float32)
 
@@ -265,7 +265,7 @@ class TestResampleFeatures:
 
     def test_boundary_values_preserved(self):
         """First and last values should be preserved"""
-        from src.core.primitives.filtering import resample_features
+        from app.core.primitives.filtering import resample_features
 
         x = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32)
 
@@ -281,7 +281,7 @@ class TestTempoSegments:
 
     def test_requires_plp_result(self):
         """Function requires PLPResult input"""
-        from src.core.primitives.rhythm import segment_by_tempo_changes, PLPResult
+        from app.core.primitives.rhythm import segment_by_tempo_changes, PLPResult
 
         # Create minimal PLPResult
         plp = PLPResult(
@@ -299,7 +299,7 @@ class TestTempoSegments:
 
     def test_single_tempo_single_segment(self):
         """Constant tempo should produce single segment"""
-        from src.core.primitives.rhythm import segment_by_tempo_changes, PLPResult
+        from app.core.primitives.rhythm import segment_by_tempo_changes, PLPResult
 
         # Constant tempo
         plp = PLPResult(

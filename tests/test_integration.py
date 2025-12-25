@@ -136,7 +136,7 @@ class TestTasksIntegration:
     """Test that all tasks are importable and work together."""
 
     def test_all_tasks_importable(self):
-        """All tasks should be importable from src.core.tasks."""
+        """All tasks should be importable from app.core.tasks."""
         from app.modules.analysis.tasks import (
             FeatureExtractionTask,
             SegmentationTask,
@@ -351,12 +351,12 @@ class TestCacheIntegration:
 
     def test_cache_repository_importable(self):
         """CacheRepository should be importable."""
-        from src.core.cache import CacheRepository
+        from app.core.cache import CacheRepository
         assert CacheRepository is not None
 
     def test_cache_models_importable(self):
         """Cache models should be importable."""
-        from src.core.cache.models import CachedSetAnalysis
+        from app.core.cache.models import CachedSetAnalysis
         assert CachedSetAnalysis is not None
 
 
