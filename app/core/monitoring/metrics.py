@@ -174,6 +174,52 @@ analysis_requests_per_hour = Gauge(
 )
 
 # =============================================================================
+# Operational Metrics (для эксплуатации)
+# =============================================================================
+
+# Зависшие задачи
+stuck_tasks_total = Gauge(
+    'stuck_tasks_total',
+    'Number of stuck tasks (processing > 10min)',
+    ['queue_name']
+)
+
+# Задачи с таймаутом
+task_timeouts_total = Counter(
+    'task_timeouts_total',
+    'Total task timeouts',
+    ['task_name']
+)
+
+# Долгоживущие задачи (>30 мин)
+long_running_tasks = Gauge(
+    'long_running_tasks',
+    'Number of tasks running longer than threshold',
+    ['task_name', 'threshold_minutes']
+)
+
+# Очередь задач по возрасту (самая старая задача)
+oldest_task_age_seconds = Gauge(
+    'oldest_task_age_seconds',
+    'Age of oldest task in queue in seconds',
+    ['queue_name']
+)
+
+# Worker health
+worker_healthy = Gauge(
+    'worker_healthy',
+    'Worker health status (1=healthy, 0=unhealthy)',
+    ['worker_id']
+)
+
+# Последний успешный heartbeat
+last_heartbeat_timestamp = Gauge(
+    'last_heartbeat_timestamp',
+    'Timestamp of last successful heartbeat',
+    ['process']  # bot, worker
+)
+
+# =============================================================================
 # Info Metrics
 # =============================================================================
 
