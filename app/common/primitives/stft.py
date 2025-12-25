@@ -962,10 +962,9 @@ def compute_stft(
         >>> print(f"Computed {cache.n_frames} frames")
         >>> rms = compute_rms(cache.S)  # Reuse cache
     """
-    from app.core.monitoring.metrics import stft_computation_seconds
-
     start_time = time.time()
     try:
+        from app.core.monitoring.metrics import stft_computation_seconds
         # Ensure contiguous array for Apple Accelerate
         y = np.ascontiguousarray(y, dtype=np.float32)
 
