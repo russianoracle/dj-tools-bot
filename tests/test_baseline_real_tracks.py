@@ -134,8 +134,15 @@ class TestRealTrackFeatureExtraction:
         """STFTCache should be populated after feature extraction."""
         from app.modules.analysis.tasks.feature_extraction import FeatureExtractionTask
 
+        # Save audio signal before clearing (needed for tempo/beats)
+        y_backup = demo_track_1_context.stft_cache._feature_cache.get('_y')
+
         # Clear cache
         demo_track_1_context.stft_cache._feature_cache.clear()
+
+        # Restore audio signal
+        if y_backup is not None:
+            demo_track_1_context.stft_cache._feature_cache['_y'] = y_backup
 
         task = FeatureExtractionTask()
         result = task.execute(demo_track_1_context)

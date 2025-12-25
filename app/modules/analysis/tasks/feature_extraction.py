@@ -232,6 +232,10 @@ class FeatureExtractionTask(BaseTask):
             )
 
             # ==================== RHYTHM FEATURES ====================
+            # Ensure audio signal available for tempo/beat detection
+            if '_y' not in context.stft_cache._feature_cache and context.y is not None:
+                context.stft_cache.set_audio(context.y)
+
             # Use STFTCache.get_*() for cache consistency
             onset_env = context.stft_cache.get_onset_strength()
             tempo, _ = context.stft_cache.get_tempo()

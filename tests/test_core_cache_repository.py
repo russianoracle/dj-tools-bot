@@ -23,9 +23,7 @@ from app.core.cache.repository import CacheRepository
 from app.core.cache.models import CachedTrackAnalysis, CachedSetAnalysis
 
 
-# Many tests use methods that don't exist in current API
-# Skip until tests are updated to match current API
-pytestmark = pytest.mark.skip(reason="Tests need update to match current CacheRepository API")
+# Tests refactored to match current CacheRepository API
 
 
 # =============================================================================
@@ -37,6 +35,21 @@ def temp_cache_dir():
     """Create temporary cache directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
+
+
+@pytest.fixture
+def temp_audio_dir():
+    """Create temporary directory for test audio files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield tmpdir
+
+
+def create_dummy_audio_file(file_path: str) -> str:
+    """Create a dummy audio file for testing."""
+    import os
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(file_path).touch()
+    return file_path
 
 
 @pytest.fixture
@@ -54,14 +67,17 @@ def cache_repo(temp_cache_dir):
 
 
 @pytest.fixture
-def sample_track_cache():
+def sample_track_cache(temp_audio_dir):
     """Create sample track cache entry."""
+    file_path = create_dummy_audio_file(f"{temp_audio_dir}/sample_track.mp3")
     return CachedTrackAnalysis(
-        file_hash="abc123",
+        file_path=file_path,
+        file_name="sample_track.mp3",
         bpm=128.0,
         key="Am",
-        energy=0.8,
-        duration_sec=180.0
+        energy_level=0.8,
+        duration_sec=180.0,
+        zone="PURPLE"
     )
 
 
@@ -113,6 +129,7 @@ class TestCacheRepositorySingleton:
 # File Hash Tests
 # =============================================================================
 
+@pytest.mark.skip(reason="_compute_file_hash() private method no longer exists in current API")
 class TestFileHashComputation:
     """Tests for file hash computation."""
 
@@ -156,52 +173,74 @@ class TestTrackCache:
 
     def test_get_track_nonexistent(self, cache_repo):
         """Test getting nonexistent track returns None."""
-        result = cache_repo.get_track("nonexistent_hash")
+        result = cache_repo.get_track("/nonexistent/track.mp3")
         assert result is None
 
-    def test_set_and_get_track(self, cache_repo, sample_track_cache):
+    def test_set_and_get_track(self, cache_repo, sample_track_cache, temp_audio_dir):
         """Test setting and retrieving track cache."""
-        file_hash = "test_hash_123"
+        file_path = create_dummy_audio_file(f"{temp_audio_dir}/test_track.mp3")
 
-        # Set track cache
-        cache_repo.set_track(file_hash, sample_track_cache)
+        analysis = CachedTrackAnalysis(
+            file_path=file_path,
+            file_name="test_track.mp3",
+            bpm=128.0,
+            key="Am",
+            energy_level=0.8,
+            duration_sec=180.0,
+            zone="PURPLE"
+        )
+
+        # Save track cache
+        cache_repo.save_track(analysis)
 
         # Get track cache
-        result = cache_repo.get_track(file_hash)
+        result = cache_repo.get_track(file_path)
 
         assert result is not None
-        assert result.file_hash == sample_track_cache.file_hash or result["zone"] == sample_track_cache.zone
-        assert result.zone == sample_track_cache.zone or result["zone"] == sample_track_cache.zone
+        assert result.bpm == 128.0
+        assert result.zone == "PURPLE"
 
-    def test_delete_track(self, cache_repo, sample_track_cache):
+    def test_delete_track(self, cache_repo, temp_audio_dir):
         """Test deleting track cache."""
-        file_hash = "test_hash_delete"
+        file_path = create_dummy_audio_file(f"{temp_audio_dir}/delete_track.mp3")
 
-        # Set track
-        cache_repo.set_track(file_hash, sample_track_cache)
+        analysis = CachedTrackAnalysis(
+            file_path=file_path,
+            file_name="delete_track.mp3",
+            bpm=120.0,
+            duration_sec=200.0
+        )
+
+        # Save track
+        cache_repo.save_track(analysis)
 
         # Verify it exists
-        assert cache_repo.get_track(file_hash) is not None
+        assert cache_repo.get_track(file_path) is not None
 
         # Delete track
-        cache_repo.delete_track(file_hash)
+        cache_repo.invalidate_track(file_path)
 
         # Verify it's gone
-        assert cache_repo.get_track(file_hash) is None
+        assert cache_repo.get_track(file_path) is None
 
-    def test_track_cache_with_file_path(self, cache_repo, sample_track_cache, tmp_path):
-        """Test track cache using file path instead of hash."""
-        # Create test file
-        test_file = tmp_path / "test.mp3"
-        test_file.write_text("audio content")
+    def test_track_cache_with_file_path(self, cache_repo, temp_audio_dir):
+        """Test track cache using file path."""
+        file_path = create_dummy_audio_file(f"{temp_audio_dir}/path_test.mp3")
 
-        # Cache should compute hash automatically
-        cache_repo.set_track(str(test_file), sample_track_cache)
+        analysis = CachedTrackAnalysis(
+            file_path=file_path,
+            file_name="path_test.mp3",
+            bpm=125.0,
+            duration_sec=190.0
+        )
+
+        # Save using file path
+        cache_repo.save_track(analysis)
 
         # Should be retrievable by path
-        result = cache_repo.get_track(str(test_file))
-        # May or may not work depending on implementation
-        assert True  # Test passes if no exception
+        result = cache_repo.get_track(file_path)
+        assert result is not None
+        assert result.bpm == 125.0
 
 
 # =============================================================================
@@ -213,91 +252,87 @@ class TestSetCache:
 
     def test_get_set_nonexistent(self, cache_repo):
         """Test getting nonexistent set returns None."""
-        result = cache_repo.get_set("nonexistent_set")
+        result = cache_repo.get_set("/nonexistent/set.mp3")
         assert result is None
 
-    def test_set_and_get_set(self, cache_repo):
+    def test_set_and_get_set(self, cache_repo, temp_audio_dir):
         """Test setting and retrieving set cache."""
-        set_hash = "set_hash_123"
+        file_path = create_dummy_audio_file(f"{temp_audio_dir}/test_set.mp3")
+
         set_data = CachedSetAnalysis(
-            file_hash=set_hash,
+            file_path=file_path,
+            file_name="test_set.mp3",
             duration_sec=3600.0,
             n_segments=10,
-            segments=[],
-            transitions=[],
-            drops=[]
+            n_transitions=5,
+            total_drops=3
         )
 
-        cache_repo.set_set(set_hash, set_data)
-        result = cache_repo.get_set(set_hash)
+        cache_repo.save_set(set_data)
+        result = cache_repo.get_set(file_path)
 
         assert result is not None
+        assert result.n_segments == 10
 
-    def test_delete_set(self, cache_repo):
+    def test_delete_set(self, cache_repo, temp_audio_dir):
         """Test deleting set cache."""
-        set_hash = "set_hash_delete"
+        file_path = create_dummy_audio_file(f"{temp_audio_dir}/delete_set.mp3")
+
         set_data = CachedSetAnalysis(
-            file_hash=set_hash,
+            file_path=file_path,
+            file_name="delete_set.mp3",
             duration_sec=3600.0,
-            n_segments=5,
-            segments=[],
-            transitions=[],
-            drops=[]
+            n_segments=5
         )
 
-        cache_repo.set_set(set_hash, set_data)
-        assert cache_repo.get_set(set_hash) is not None
+        cache_repo.save_set(set_data)
+        assert cache_repo.get_set(file_path) is not None
 
-        cache_repo.delete_set(set_hash)
-        assert cache_repo.get_set(set_hash) is None
+        cache_repo.invalidate_set(file_path)
+        assert cache_repo.get_set(file_path) is None
 
 
 # =============================================================================
 # STFT Cache Tests
 # =============================================================================
 
+@pytest.mark.skip(reason="STFT cache tests need investigation - requires STFTCache class from primitives")
 class TestSTFTCache:
     """Tests for STFT cache operations."""
 
     def test_get_stft_nonexistent(self, cache_repo):
         """Test getting nonexistent STFT returns None."""
-        result = cache_repo.get_stft("nonexistent_stft")
+        result = cache_repo.get_stft("nonexistent_hash")
         assert result is None
 
     def test_set_and_get_stft(self, cache_repo, sample_audio):
         """Test setting and retrieving STFT cache."""
+        from app.common.primitives.stft import STFTCache
+
         audio, sr = sample_audio
-        stft_hash = "stft_hash_123"
+        file_hash = "stft_hash_123"
 
-        # Create mock STFT data
-        stft_data = {
-            "audio": audio,
-            "sr": sr,
-            "stft": np.random.randn(1025, 100).astype(np.float32)
-        }
+        # Create STFTCache object
+        stft_cache = STFTCache(audio, sr)
 
-        cache_repo.set_stft(stft_hash, stft_data)
-        result = cache_repo.get_stft(stft_hash)
+        cache_repo.save_stft(file_hash, stft_cache)
+        result = cache_repo.get_stft(file_hash)
 
         # May be None if STFT cache not implemented yet
         assert True  # Test passes if no exception
 
     def test_stft_cache_with_numpy_arrays(self, cache_repo, sample_audio):
         """Test STFT cache handles numpy arrays correctly."""
+        from app.common.primitives.stft import STFTCache
+
         audio, sr = sample_audio
 
-        stft_data = {
-            "audio": audio,
-            "sr": sr,
-            "features": {
-                "rms": np.random.randn(100).astype(np.float32),
-                "spectral_centroid": np.random.randn(100).astype(np.float32)
-            }
-        }
+        # Create STFTCache object
+        stft_cache = STFTCache(audio, sr)
 
-        # Should handle numpy arrays in nested structures
+        # Should handle STFTCache object
         try:
-            cache_repo.set_stft("stft_numpy_test", stft_data)
+            cache_repo.save_stft("stft_numpy_test", stft_cache)
             result = cache_repo.get_stft("stft_numpy_test")
             assert True
         except Exception:
@@ -312,27 +347,31 @@ class TestSTFTCache:
 class TestCacheCleanup:
     """Tests for cache cleanup operations."""
 
-    def test_clear_all_tracks(self, cache_repo, sample_track_cache):
-        """Test clearing all track caches."""
+    def test_clear_all_tracks(self, cache_repo, temp_audio_dir):
+        """Test clearing all caches."""
         # Add multiple tracks
         for i in range(5):
-            cache_repo.set_track(f"track_{i}", sample_track_cache)
+            file_path = create_dummy_audio_file(f"{temp_audio_dir}/track_{i}.mp3")
+            analysis = CachedTrackAnalysis(
+                file_path=file_path,
+                file_name=f"track_{i}.mp3",
+                bpm=120.0 + i,
+                duration_sec=180.0
+            )
+            cache_repo.save_track(analysis)
 
-        # Clear all (if method exists)
-        if hasattr(cache_repo, "clear_all_tracks"):
-            cache_repo.clear_all_tracks()
+        # Clear all
+        cache_repo.clear_all()
 
-            # Verify all gone
-            for i in range(5):
-                assert cache_repo.get_track(f"track_{i}") is None
+        # Verify all gone
+        for i in range(5):
+            file_path = f"{temp_audio_dir}/track_{i}.mp3"
+            assert cache_repo.get_track(file_path) is None
 
+    @pytest.mark.skip(reason="Cache expiration/TTL not implemented in current API")
     def test_cache_expiration(self, cache_repo, sample_track_cache):
         """Test cache entries expire according to TTL."""
         # This test requires waiting for TTL, so we just verify
         # the cache accepts TTL parameter
-        cache_repo.set_track("expiring_track", sample_track_cache, ttl=1)
-
-        # Immediately should still exist
-        result = cache_repo.get_track("expiring_track")
-        # May or may not exist depending on implementation
-        assert True  # Test passes if no exception
+        # TTL parameter doesn't exist in current save_track() API
+        pass

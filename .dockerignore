@@ -4,6 +4,7 @@
 # Training/dev uses requirements-training.txt (includes pyrekordbox)
 training/
 scripts/
+!scripts/production/
 data/
 experiments/
 # tests/ - NEEDED for multi-stage build (test stage)

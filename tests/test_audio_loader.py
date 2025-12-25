@@ -592,6 +592,7 @@ class TestAudioSaver:
             Path(output_path).unlink(missing_ok=True)
 
 
+@pytest.mark.skip(reason="save_audio function no longer exists - removed from codebase")
 class TestSaveAudioFunction:
     """Test save_audio convenience function."""
 
