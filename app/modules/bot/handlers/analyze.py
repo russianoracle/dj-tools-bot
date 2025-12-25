@@ -6,6 +6,7 @@ Uses ARQ for async task queue (compatible with Redis 8.x/Valkey).
 """
 
 import os
+import asyncio
 from datetime import datetime
 
 from aiogram import Router, F, Bot
@@ -44,6 +45,10 @@ from app.services.arq_worker import (
     enqueue_analyze_set,
     enqueue_download_and_analyze,
 )
+
+# Bot services
+from ..services.url_parser import URLParser
+from ..services.notifications import send_auto_delete_notification
 
 # Environment
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "500"))
@@ -84,6 +89,87 @@ def get_state_emoji(state: str) -> str:
         "SUCCESS": "✅",
         "FAILURE": "❌",
     }.get(state, "❓")
+
+
+@router.message(F.text.regexp(r'https?://'))
+async def global_url_handler(message: Message, state: FSMContext, bot: Bot):
+    """
+    Global URL handler for batch processing from any menu location.
+
+    This handler intercepts messages containing URLs and queues them
+    for analysis without disrupting the current menu or FSM state.
+    """
+    if message.from_user.id in banned_users:
+        return
+
+    # Skip if user is in explicit URL input mode (let process_url handle it)
+    current_state = await state.get_state()
+    if current_state == AnalyzeStates.waiting_for_url.state:
+        return
+
+    user_id = message.from_user.id
+
+    # Parse and validate URLs
+    parser = URLParser()
+    parsed_urls = parser.parse_batch(message.text)
+    valid_urls = [p for p in parsed_urls if p.is_valid]
+
+    if not valid_urls:
+        # No valid URLs found
+        error_msg = (
+            "❌ <b>No valid URLs found</b>\n\n"
+            "Supported platforms:\n"
+            "• SoundCloud\n"
+            "• Mixcloud\n"
+            "• YouTube"
+        )
+        asyncio.create_task(
+            send_auto_delete_notification(message, error_msg, delete_after=5)
+        )
+        return
+
+    # Enqueue each valid URL
+    job_ids = []
+    for parsed in valid_urls:
+        try:
+            job_id = await enqueue_download_and_analyze(parsed.url, user_id)
+            job_ids.append(job_id)
+
+            # Store job ID for user
+            if user_id not in user_jobs:
+                user_jobs[user_id] = []
+            user_jobs[user_id].append(job_id)
+
+            logger.info(
+                f"Queued URL for analysis",
+                extra={
+                    "user_id": user_id,
+                    "platform": parsed.platform,
+                    "job_id": job_id,
+                    "correlation_id": get_correlation_id(),
+                }
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to enqueue URL",
+                extra={
+                    "user_id": user_id,
+                    "url": parsed.url,
+                    "error": str(e),
+                    "correlation_id": get_correlation_id(),
+                }
+            )
+
+    # Send notification
+    if job_ids:
+        count = len(job_ids)
+        notification_text = (
+            f"✅ <b>{count} track{'s' if count > 1 else ''} queued</b>\n"
+            f"Analysis started in background"
+        )
+        asyncio.create_task(
+            send_auto_delete_notification(message, notification_text, delete_after=4)
+        )
 
 
 @router.callback_query(F.data == "analyze_url")
