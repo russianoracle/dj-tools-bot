@@ -35,3 +35,12 @@ remote_write:
       max_backoff: 15s
     metadata_config:
       send: false
+
+remote_read:
+  - url: 'https://monitoring.api.cloud.yandex.net/prometheus/workspaces/monhr2m0jl118pvk9mtu/api/v1/read'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/api_key.txt
+    headers:
+      X-Lookback-Delta: 5m
+    read_recent: true
