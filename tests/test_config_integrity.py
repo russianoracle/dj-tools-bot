@@ -151,6 +151,8 @@ class TestConfigIntegrity:
             "REQUIRE_SECRETS",  # Runtime flag
             "METRICS_PORT", "METRICS_UPDATE_INTERVAL", "PROCESS_NAME",  # Metrics
             "DATA_DIR", "YC_FOLDER_ID", "PROMETHEUS_API_KEY",  # Intentionally commented in .env.example
+            "GF_AUTH_ANONYMOUS_ENABLED", "GF_SECURITY_ADMIN_PASSWORD", "GF_SECURITY_ADMIN_USER",  # Grafana
+            "GF_SERVER_ROOT_URL", "GF_USERS_ALLOW_SIGN_UP",  # Grafana
         }
 
         all_documented = settings_vars | env_example_vars.keys() | DOCKER_ONLY_VARS

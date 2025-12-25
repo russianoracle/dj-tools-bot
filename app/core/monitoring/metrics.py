@@ -68,7 +68,7 @@ analysis_duration_seconds = Histogram(
 stft_computation_seconds = Histogram(
     'stft_computation_seconds',
     'STFT computation duration in seconds',
-    ['mode'],  # standard, streaming
+    ['sample_rate'],  # 22050, 44100
     buckets=[0.5, 1, 2, 5, 10, 20, 30, 60, 120]
 )
 
@@ -98,6 +98,25 @@ cache_entries_total = Gauge(
     'cache_entries_total',
     'Total cache entries',
     ['cache_type']
+)
+
+cache_hits_total = Counter(
+    'cache_hits_total',
+    'Total cache hits',
+    ['cache_type']  # set, track, profile, stft, features
+)
+
+cache_misses_total = Counter(
+    'cache_misses_total',
+    'Total cache misses',
+    ['cache_type']
+)
+
+cache_operation_duration_seconds = Histogram(
+    'cache_operation_duration_seconds',
+    'Cache operation duration',
+    ['cache_type', 'operation'],  # operation: get, save, invalidate
+    buckets=[0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5]
 )
 
 # =============================================================================

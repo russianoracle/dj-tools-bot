@@ -46,6 +46,11 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, TYPE_CHECKING
 
 from app.common.logging import get_logger
+from app.core.monitoring.metrics import (
+    cache_hits_total,
+    cache_misses_total,
+    cache_operation_duration_seconds,
+)
 from .models import (
     CachedSetAnalysis,
     CachedTrackAnalysis,
@@ -122,15 +127,30 @@ class CacheRepository(ICacheStatusProvider):
         Returns:
             CachedSetAnalysis or None if not cached/outdated
         """
+        start_time = time.perf_counter()
         file_path = os.path.abspath(file_path)
         cached_dict = self._manager.get_set_analysis(file_path)
 
         if cached_dict:
             try:
-                return CachedSetAnalysis.from_dict(cached_dict)
+                result = CachedSetAnalysis.from_dict(cached_dict)
+                cache_hits_total.labels(cache_type='set').inc()
+                cache_operation_duration_seconds.labels(
+                    cache_type='set', operation='get'
+                ).observe(time.perf_counter() - start_time)
+                return result
             except Exception as e:
                 logger.warning(f"Failed to parse cached set: {e}")
+                cache_misses_total.labels(cache_type='set').inc()
+                cache_operation_duration_seconds.labels(
+                    cache_type='set', operation='get'
+                ).observe(time.perf_counter() - start_time)
                 return None
+
+        cache_misses_total.labels(cache_type='set').inc()
+        cache_operation_duration_seconds.labels(
+            cache_type='set', operation='get'
+        ).observe(time.perf_counter() - start_time)
         return None
 
     def save_set(self, analysis: CachedSetAnalysis) -> bool:
@@ -143,12 +163,19 @@ class CacheRepository(ICacheStatusProvider):
         Returns:
             True if saved successfully
         """
+        start_time = time.perf_counter()
         try:
             file_path = os.path.abspath(analysis.file_path)
             self._manager.save_set_analysis(file_path, analysis.to_dict())
+            cache_operation_duration_seconds.labels(
+                cache_type='set', operation='save'
+            ).observe(time.perf_counter() - start_time)
             return True
         except Exception as e:
             logger.error(f"Failed to save set cache: {e}")
+            cache_operation_duration_seconds.labels(
+                cache_type='set', operation='save'
+            ).observe(time.perf_counter() - start_time)
             return False
 
     def save_set_dict(self, file_path: str, result_dict: Dict) -> bool:
@@ -174,8 +201,12 @@ class CacheRepository(ICacheStatusProvider):
 
     def invalidate_set(self, file_path: str):
         """Remove set analysis from cache."""
+        start_time = time.perf_counter()
         file_path = os.path.abspath(file_path)
         self._manager.invalidate_set_analysis(file_path)
+        cache_operation_duration_seconds.labels(
+            cache_type='set', operation='invalidate'
+        ).observe(time.perf_counter() - start_time)
 
     def get_all_cached_sets(self) -> List[str]:
         """Get paths of all cached sets."""
@@ -193,15 +224,30 @@ class CacheRepository(ICacheStatusProvider):
         Returns:
             CachedTrackAnalysis or None if not cached/outdated
         """
+        start_time = time.perf_counter()
         file_path = os.path.abspath(file_path)
         cached_dict = self._manager.get_track_analysis(file_path)
 
         if cached_dict:
             try:
-                return CachedTrackAnalysis.from_dict(cached_dict)
+                result = CachedTrackAnalysis.from_dict(cached_dict)
+                cache_hits_total.labels(cache_type='track').inc()
+                cache_operation_duration_seconds.labels(
+                    cache_type='track', operation='get'
+                ).observe(time.perf_counter() - start_time)
+                return result
             except Exception as e:
                 logger.warning(f"Failed to parse cached track: {e}")
+                cache_misses_total.labels(cache_type='track').inc()
+                cache_operation_duration_seconds.labels(
+                    cache_type='track', operation='get'
+                ).observe(time.perf_counter() - start_time)
                 return None
+
+        cache_misses_total.labels(cache_type='track').inc()
+        cache_operation_duration_seconds.labels(
+            cache_type='track', operation='get'
+        ).observe(time.perf_counter() - start_time)
         return None
 
     def save_track(self, analysis: CachedTrackAnalysis) -> bool:
@@ -214,12 +260,19 @@ class CacheRepository(ICacheStatusProvider):
         Returns:
             True if saved successfully
         """
+        start_time = time.perf_counter()
         try:
             file_path = os.path.abspath(analysis.file_path)
             self._manager.save_track_analysis(file_path, analysis.to_dict())
+            cache_operation_duration_seconds.labels(
+                cache_type='track', operation='save'
+            ).observe(time.perf_counter() - start_time)
             return True
         except Exception as e:
             logger.error(f"Failed to save track cache: {e}")
+            cache_operation_duration_seconds.labels(
+                cache_type='track', operation='save'
+            ).observe(time.perf_counter() - start_time)
             return False
 
     def save_track_dict(self, file_path: str, result_dict: Dict) -> bool:
@@ -243,8 +296,12 @@ class CacheRepository(ICacheStatusProvider):
 
     def invalidate_track(self, file_path: str):
         """Remove track analysis from cache."""
+        start_time = time.perf_counter()
         file_path = os.path.abspath(file_path)
         self._manager.invalidate_track_analysis(file_path)
+        cache_operation_duration_seconds.labels(
+            cache_type='track', operation='invalidate'
+        ).observe(time.perf_counter() - start_time)
 
     def get_all_cached_tracks(self) -> List[str]:
         """Get paths of all cached tracks."""
@@ -372,6 +429,7 @@ class CacheRepository(ICacheStatusProvider):
         Returns:
             Number of invalidated entries
         """
+        start_time = time.perf_counter()
         directory = os.path.abspath(directory)
         cached_paths = self.get_all_cached_sets()
         count = 0
@@ -381,6 +439,9 @@ class CacheRepository(ICacheStatusProvider):
                 self.invalidate_set(path)
                 count += 1
 
+        cache_operation_duration_seconds.labels(
+            cache_type='set', operation='invalidate_directory'
+        ).observe(time.perf_counter() - start_time)
         logger.info(f"Invalidated {count} cache entries in {directory}")
         return count
 
@@ -394,6 +455,7 @@ class CacheRepository(ICacheStatusProvider):
         Returns:
             Number of invalidated entries (1 profile + N sets)
         """
+        start_time = time.perf_counter()
         dj_name_lower = dj_name.lower()
         count = 0
 
@@ -408,6 +470,9 @@ class CacheRepository(ICacheStatusProvider):
         self._manager.delete_dj_profile(dj_name_lower)
         count += 1
 
+        cache_operation_duration_seconds.labels(
+            cache_type='profile', operation='invalidate'
+        ).observe(time.perf_counter() - start_time)
         logger.info(f"Invalidated DJ profile '{dj_name}' and {count - 1} associated sets")
         return count
 

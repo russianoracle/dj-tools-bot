@@ -19,6 +19,10 @@ from dataclasses import dataclass
 import json
 
 from app.common.primitives import STFTCache
+from app.common.logging import get_logger
+from app.core.errors import CacheError
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -282,7 +286,11 @@ class CacheManager:
                 hop_length=meta['hop_length'],
                 n_fft=meta['n_fft']
             )
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to load STFT from cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
             return None
 
     def save_stft(self, file_hash: str, cache: STFTCache):
@@ -306,8 +314,11 @@ class CacheManager:
             }
             with open(self.stft_dir / f"{file_hash}_meta.json", 'w') as f:
                 json.dump(meta, f)
-        except Exception:
-            pass  # Silently fail on cache errors
+        except Exception as e:
+            logger.warning("Failed to save STFT to cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
 
     # ============== Features Cache ==============
 
@@ -323,7 +334,11 @@ class CacheManager:
         try:
             with open(path, 'rb') as f:
                 return pickle.load(f)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load features from cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
             return None
 
     def save_features(self, file_hash: str, features: np.ndarray):
@@ -335,8 +350,11 @@ class CacheManager:
             path = self.features_dir / f"{file_hash}.pkl"
             with open(path, 'wb') as f:
                 pickle.dump(features, f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to save features to cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
 
     def get_features_dict(self, file_hash: str) -> Optional[Dict[str, float]]:
         """Get cached features as dictionary."""
@@ -347,7 +365,11 @@ class CacheManager:
         try:
             with open(path, 'rb') as f:
                 return pickle.load(f)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load features dict from cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
             return None
 
     def save_features_dict(self, file_hash: str, features: Dict[str, float]):
@@ -359,8 +381,11 @@ class CacheManager:
             path = self.features_dir / f"{file_hash}_dict.pkl"
             with open(path, 'wb') as f:
                 pickle.dump(features, f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to save features dict to cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
 
     # ============== Derived Features Cache (for calibration) ==============
 
@@ -388,7 +413,12 @@ class CacheManager:
             # Load without mmap to avoid file descriptor leaks
             # Copy is needed anyway for safe usage across boundaries
             return np.load(path, mmap_mode=None)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load derived feature from cache", data={
+                "file_hash": file_hash,
+                "feature_name": feature_name,
+                "error": str(e)
+            })
             return None
 
     def save_derived_feature(self, file_hash: str, feature_name: str, data: np.ndarray):
@@ -406,8 +436,12 @@ class CacheManager:
         try:
             path = self.stft_dir / f"{file_hash}_{feature_name}.npy"
             np.save(path, np.ascontiguousarray(data))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to save derived feature to cache", data={
+                "file_hash": file_hash,
+                "feature_name": feature_name,
+                "error": str(e)
+            })
 
     def get_derived_features_batch(
         self,
@@ -469,7 +503,11 @@ class CacheManager:
             try:
                 with open(metadata_path) as f:
                     return json.load(f)
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to load derived feature metadata", data={
+                    "file_hash": file_hash,
+                    "error": str(e)
+                })
                 return None
         return None
 
@@ -510,7 +548,11 @@ class CacheManager:
             if row:
                 return row[0], row[1], json.loads(row[2])
             return None
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load prediction from cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
             return None
 
     def save_prediction(
@@ -535,8 +577,11 @@ class CacheManager:
             ''', (file_hash, zone, confidence, json.dumps(zone_scores), time.time()))
             conn.commit()
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to save prediction to cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
 
     # ============== Cache Management ==============
 
@@ -561,8 +606,11 @@ class CacheManager:
             cursor.execute('DELETE FROM predictions WHERE file_hash = ?', (file_hash,))
             conn.commit()
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to invalidate prediction cache", data={
+                "file_hash": file_hash,
+                "error": str(e)
+            })
 
     def clear_all(self):
         """Clear all cached data."""
@@ -612,8 +660,8 @@ class CacheManager:
             cursor.execute('SELECT COUNT(*) FROM predictions')
             prediction_count = cursor.fetchone()[0]
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to get prediction count", data={"error": str(e)})
 
         return {
             'cache_dir': str(self.cache_dir),
@@ -646,8 +694,11 @@ class CacheManager:
             ''')
             conn.commit()
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to cleanup old cache entries", data={
+                "max_age_days": max_age_days,
+                "error": str(e)
+            })
 
     # ============== Set Analysis Cache (NEW) ==============
 
@@ -708,7 +759,11 @@ class CacheManager:
                 return json.loads(result_row[0])
             return None
 
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load set analysis from cache", data={
+                "file_path": file_path,
+                "error": str(e)
+            })
             return None
 
     def save_set_analysis(self, file_path: str, result: Dict):

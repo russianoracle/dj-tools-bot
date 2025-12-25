@@ -18,6 +18,7 @@ Apple Silicon M2 Optimized:
 """
 
 import gc
+import time
 import numpy as np
 import scipy.signal
 import scipy.fftpack
@@ -961,38 +962,45 @@ def compute_stft(
         >>> print(f"Computed {cache.n_frames} frames")
         >>> rms = compute_rms(cache.S)  # Reuse cache
     """
-    # Ensure contiguous array for Apple Accelerate
-    y = np.ascontiguousarray(y, dtype=np.float32)
+    from app.core.monitoring.metrics import stft_computation_seconds
 
-    # Compute complex STFT using pure numpy
-    D = _stft_numpy(y, n_fft=n_fft, hop_length=hop_length)
+    start_time = time.time()
+    try:
+        # Ensure contiguous array for Apple Accelerate
+        y = np.ascontiguousarray(y, dtype=np.float32)
 
-    # Extract magnitude and phase (vectorized)
-    S = np.ascontiguousarray(np.abs(D), dtype=np.float32)
-    phase = np.ascontiguousarray(np.angle(D), dtype=np.float32)
-    del D  # Free 2.19 GB complex array immediately after extraction
-    gc.collect()
+        # Compute complex STFT using pure numpy
+        D = _stft_numpy(y, n_fft=n_fft, hop_length=hop_length)
 
-    # Compute dB spectrogram using pure numpy
-    S_db = _amplitude_to_db(S, ref=ref, top_db=top_db)
+        # Extract magnitude and phase (vectorized)
+        S = np.ascontiguousarray(np.abs(D), dtype=np.float32)
+        phase = np.ascontiguousarray(np.angle(D), dtype=np.float32)
+        del D  # Free 2.19 GB complex array immediately after extraction
+        gc.collect()
 
-    # Compute frequency and time axes using pure numpy
-    freqs = _fft_frequencies(sr=sr, n_fft=n_fft)
-    times = _frames_to_time(np.arange(S.shape[1]), sr=sr, hop_length=hop_length)
+        # Compute dB spectrogram using pure numpy
+        S_db = _amplitude_to_db(S, ref=ref, top_db=top_db)
 
-    cache = STFTCache(
-        S=S,
-        S_db=S_db,
-        phase=phase,
-        freqs=freqs,
-        times=times,
-        sr=sr,
-        hop_length=hop_length,
-        n_fft=n_fft
-    )
-    # Store original audio for HPSS and other audio-domain features
-    cache.set_audio(y)
-    return cache
+        # Compute frequency and time axes using pure numpy
+        freqs = _fft_frequencies(sr=sr, n_fft=n_fft)
+        times = _frames_to_time(np.arange(S.shape[1]), sr=sr, hop_length=hop_length)
+
+        cache = STFTCache(
+            S=S,
+            S_db=S_db,
+            phase=phase,
+            freqs=freqs,
+            times=times,
+            sr=sr,
+            hop_length=hop_length,
+            n_fft=n_fft
+        )
+        # Store original audio for HPSS and other audio-domain features
+        cache.set_audio(y)
+        return cache
+    finally:
+        duration = time.time() - start_time
+        stft_computation_seconds.labels(sample_rate=str(sr)).observe(duration)
 
 
 def stft_to_mel(

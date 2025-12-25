@@ -58,7 +58,6 @@ jobs:
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
@@ -293,6 +292,12 @@ jobs:
           mkdir -p /home/ubuntu/app/scripts
           rsync -av --delete "$CHECKOUT_DIR/scripts/" /home/ubuntu/app/scripts/ 2>/dev/null && echo "✅ scripts/" || echo "⚠️  scripts/ not found"
           chmod +x /home/ubuntu/app/scripts/*.sh /home/ubuntu/app/scripts/*.py 2>/dev/null || true
+
+          # Copy monitoring directory (Prometheus + Grafana configs)
+          echo "Copying monitoring configuration files..."
+          mkdir -p /home/ubuntu/app/monitoring/grafana/provisioning/datasources
+          mkdir -p /home/ubuntu/app/monitoring/grafana/provisioning/dashboards
+          rsync -av "$CHECKOUT_DIR/app/monitoring/" /home/ubuntu/app/monitoring/ 2>/dev/null && echo "✅ monitoring/" || echo "⚠️  monitoring/ not found"
 
           # Stop and REMOVE containers to force recreate with new config
           echo "Stopping and removing containers to apply new configuration..."

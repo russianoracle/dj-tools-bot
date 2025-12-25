@@ -61,8 +61,9 @@ def compute_rms(S: np.ndarray, _warn: bool = True) -> np.ndarray:
     """
     Compute RMS energy from magnitude spectrogram.
 
-    DEPRECATED: Use STFTCache.get_rms() for consistency with FeatureFactory.
-    This function uses a different algorithm and will give different results.
+    DEPRECATED: This is a legacy wrapper. Use STFTCache.get_rms() directly.
+    For backward compatibility, this function uses the SAME algorithm as STFTCache.get_rms():
+        RMS = sqrt(mean(S^2)) along frequency axis
 
     M2-optimized: Ensures contiguous array for Apple Accelerate BLAS.
 
@@ -75,8 +76,7 @@ def compute_rms(S: np.ndarray, _warn: bool = True) -> np.ndarray:
     """
     if _warn:
         warnings.warn(
-            "compute_rms() is deprecated. Use STFTCache.get_rms() for consistency. "
-            "This function uses sqrt(mean(S^2)) while librosa uses a different method.",
+            "compute_rms() is deprecated. Use STFTCache.get_rms() for consistency.",
             DeprecationWarning,
             stacklevel=2
         )
@@ -84,6 +84,7 @@ def compute_rms(S: np.ndarray, _warn: bool = True) -> np.ndarray:
     S = np.ascontiguousarray(S, dtype=np.float32)
 
     # RMS = sqrt(mean(S^2)) along frequency axis
+    # Same algorithm as STFTCache.get_rms() for backward compatibility
     return np.sqrt(np.mean(S ** 2, axis=0))
 
 

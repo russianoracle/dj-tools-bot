@@ -826,7 +826,7 @@ class SetAnalysisPipeline(Pipeline):
 
 class SetBatchAnalyzer:
     """
-    Пакетный анализ DJ сетов с автоматическим checkpoint через CacheManager.
+    Пакетный анализ DJ сетов с автоматическим checkpoint через CacheRepository.
 
     Независим от DJStyleExtractor — только анализ, без построения профиля.
     Результаты автоматически кэшируются в predictions.db.
@@ -941,7 +941,7 @@ class SetBatchAnalyzer:
                 result = pipeline.analyze(abs_path)
 
                 # СРАЗУ сохранить в кэш (checkpoint)
-                self.cache_manager.save_set_analysis(abs_path, result.to_dict())
+                self.cache_repo.save_set(abs_path, result.to_dict())
 
                 if show_progress:
                     status = "OK" if result.success else "FAIL"
@@ -996,7 +996,7 @@ class SetBatchAnalyzer:
         # Vectorized: check all paths
         abs_paths = np.array([os.path.abspath(p) for p in set_paths])
         cached_mask = np.array([
-            self.cache_manager.get_set_analysis(p) is not None for p in abs_paths
+            self.cache_repo.get_set(p) is not None for p in abs_paths
         ])
 
         cached_count = int(np.sum(cached_mask))
@@ -1019,9 +1019,9 @@ class SetBatchAnalyzer:
         if set_paths:
             abs_paths = [os.path.abspath(p) for p in set_paths]
             for abs_path in abs_paths:
-                self.cache_manager.invalidate_set_analysis(abs_path)
+                self.cache_repo.invalidate_set(abs_path)
         else:
-            self.cache_manager.clear_set_analysis_cache()
+            self.cache_repo.clear_all_sets()
 
     def _result_from_dict(self, data: Dict) -> 'SetAnalysisResult':
         """
