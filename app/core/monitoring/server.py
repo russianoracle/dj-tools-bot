@@ -6,15 +6,12 @@ Runs in background thread to not block main application.
 """
 
 import logging
-from prometheus_client import start_http_server, REGISTRY, ProcessCollector, GCCollector, PlatformCollector
+from prometheus_client import start_http_server, REGISTRY
 from threading import Thread
 import time
 import os
 
-# Register default Prometheus collectors for process metrics
-ProcessCollector(registry=REGISTRY)
-GCCollector(registry=REGISTRY)
-PlatformCollector(registry=REGISTRY)
+# Note: ProcessCollector, GCCollector, PlatformCollector are registered automatically by prometheus_client
 
 logger = logging.getLogger(__name__)
 
