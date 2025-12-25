@@ -42,6 +42,12 @@ class Settings:
     redis_url: Optional[str] = field(
         default_factory=lambda: os.getenv("REDIS_URL")
     )
+    redis_host: str = field(
+        default_factory=lambda: os.getenv("REDIS_HOST", "localhost")
+    )
+    redis_port: int = field(
+        default_factory=lambda: int(os.getenv("REDIS_PORT", "6379"))
+    )
     db_path: str = field(
         default_factory=lambda: os.getenv("DB_PATH", "cache/predictions.db")
     )
@@ -50,8 +56,8 @@ class Settings:
     log_level: LogLevel = field(
         default_factory=lambda: LogLevel(os.getenv("LOG_LEVEL", "INFO"))
     )
-    log_json: bool = field(
-        default_factory=lambda: os.getenv("LOG_JSON", "false").lower() == "true"
+    log_json_format: bool = field(
+        default_factory=lambda: os.getenv("LOG_JSON_FORMAT", "false").lower() == "true"
     )
 
     # Telegram

@@ -207,15 +207,13 @@ def download_with_failover(url: str, output_template: str) -> str:
     return download_audio(url, output_template)
 
 # Redis settings
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-
-
 def get_redis_settings() -> RedisSettings:
-    """Get Redis connection settings."""
+    """Get Redis connection settings from centralized config."""
+    from app.core.config import get_settings
+    settings = get_settings()
     return RedisSettings(
-        host=REDIS_HOST,
-        port=REDIS_PORT,
+        host=settings.redis_host,
+        port=settings.redis_port,
     )
 
 

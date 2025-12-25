@@ -84,6 +84,10 @@ class TestAccuracy:
 class TestMemoryEfficiency:
     """Test memory cleanup and efficiency."""
 
+    @pytest.mark.skipif(
+        __import__('platform').system() == 'Darwin',
+        reason="macOS memory allocator doesn't immediately return RSS to OS"
+    )
     def test_gc_collect_frees_memory(self):
         """Verify del + gc.collect() actually frees memory."""
         process = psutil.Process()

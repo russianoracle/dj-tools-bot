@@ -86,9 +86,9 @@ class JSONFormatter(logging.Formatter):
         if self.include_path:
             log_entry["path"] = f"{record.pathname}:{record.lineno}"
 
-        # Message (ensure non-empty)
+        # Message
         message = record.getMessage()
-        log_entry["message"] = message if message and message.strip() else "[Empty log message]"
+        log_entry["message"] = message.strip() if message else ""
 
         # Correlation ID
         if hasattr(record, "correlation_id") and record.correlation_id:
@@ -180,11 +180,11 @@ class StructuredLogAdapter(logging.LoggerAdapter):
             msg: Log message to validate
 
         Returns:
-            Validated message (fallback if empty)
+            Validated message (empty string if no message)
         """
         if not msg or not msg.strip():
-            # Return placeholder for empty messages to avoid empty log records
-            return "[Empty log message]"
+            # Return empty string - Fluent Bit filter will drop these records
+            return ""
         return msg
 
     def info(self, msg: str, *args, data: dict | None = None, **kwargs):

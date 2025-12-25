@@ -134,9 +134,7 @@ experiments/
     def test_optional_files_handling(self, mock_project):
         """Test that optional files don't break deployment."""
         optional_files = [
-            "docker-compose.example.yml",
             "docker-compose.build.yml",
-            "docker-compose.prod.yml",
             "fluent-bit.conf",
             "parsers.conf",
             "healthcheck_worker.py",
@@ -301,9 +299,7 @@ class TestDeployFileList:
     def test_optional_docker_files(self):
         """Test optional Docker files that may be copied."""
         optional_docker = [
-            "docker-compose.example.yml",
             "docker-compose.build.yml",
-            "docker-compose.prod.yml",
             "fluent-bit.conf",
             "parsers.conf",
             "healthcheck_worker.py",
