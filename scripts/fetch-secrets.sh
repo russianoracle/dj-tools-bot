@@ -17,6 +17,7 @@
 #   - YC_LOG_GROUP_ID (optional, for cloud logging)
 #   - S3_ACCESS_KEY_ID (optional, for Object Storage logging)
 #   - S3_SECRET_ACCESS_KEY (optional, for Object Storage logging)
+#   - PROMETHEUS_API_KEY (optional, for Prometheus remote_write to Yandex Monitoring)
 
 set -e
 
@@ -203,7 +204,7 @@ echo ""
 echo "[4/4] Validating secrets..."
 
 REQUIRED_SECRETS="TELEGRAM_BOT_TOKEN YC_LOG_GROUP_ID"
-OPTIONAL_SECRETS="ADMIN_USER_ID YTDLP_PROXY S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY"
+OPTIONAL_SECRETS="ADMIN_USER_ID YTDLP_PROXY S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY PROMETHEUS_API_KEY"
 # Note: Lockbox keys are lowercase, converted to UPPERCASE for env vars
 MISSING_REQUIRED=""
 MISSING_OPTIONAL=""

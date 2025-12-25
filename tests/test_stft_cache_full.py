@@ -105,10 +105,12 @@ class TestComputeSTFT:
         assert stft_cache.S_db.flags['C_CONTIGUOUS']
 
     def test_stores_audio(self, synthetic_audio):
-        """compute_stft stores original audio for HPSS."""
+        """compute_stft stores original audio for HPSS/tempo/beat detection."""
         y, sr = synthetic_audio
         cache = compute_stft(y, sr=sr)
-        assert '_y' in cache._feature_cache
+        # After refactoring: audio stored in separate _audio field, not _feature_cache
+        assert cache._audio is not None
+        assert len(cache._audio) == len(y)
 
 
 # =============================================================================
@@ -358,7 +360,7 @@ class TestLazyAudioProcessing:
         y, sr = synthetic_audio
         # Create cache without set_audio
         cache = compute_stft(y, sr)
-        cache._feature_cache.pop('_y', None)  # Remove stored audio
+        cache._audio = None  # Remove stored audio (new architecture)
 
         with pytest.raises(ValueError, match="audio not set"):
             cache.get_hpss()

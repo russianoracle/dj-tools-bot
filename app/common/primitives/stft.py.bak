@@ -575,10 +575,10 @@ class STFTCache:
         """
         cache_key = f"tempo_{start_bpm}"
         if cache_key not in self._feature_cache:
-            if self._audio is None:
+            if '_y' not in self._feature_cache:
                 raise ValueError("Audio signal not available. Call set_audio() first.")
             from .audio_stft_loader import get_beat_frames
-            y = self._audio
+            y = self._feature_cache['_y']
             tempo, beats = get_beat_frames(y, self.sr, self.hop_length)
             # Confidence from beat regularity
             if len(beats) > 1:
@@ -602,10 +602,10 @@ class STFTCache:
         """
         cache_key = f"beats_{start_bpm}_{tightness}"
         if cache_key not in self._feature_cache:
-            if self._audio is None:
+            if '_y' not in self._feature_cache:
                 raise ValueError("Audio signal not available. Call set_audio() first.")
             from .audio_stft_loader import get_beat_frames
-            y = self._audio
+            y = self._feature_cache['_y']
             tempo, beats = get_beat_frames(y, self.sr, self.hop_length)
             # Convert frames to times using pure numpy
             beat_times = _frames_to_time(beats.astype(np.float32), self.sr, self.hop_length)
@@ -833,9 +833,9 @@ class STFTCache:
         cache_key = "zcr"
         if cache_key not in self._feature_cache:
             if y is None:
-                if self._audio is None:
+                if '_y' not in self._feature_cache:
                     raise ValueError("Original audio not set. Call set_audio(y) first.")
-                y = self._audio
+                y = self._feature_cache['_y']
             zcr = _zero_crossing_rate(y, self.hop_length)
             self._feature_cache[cache_key] = np.ascontiguousarray(zcr, dtype=np.float32)
         return self._feature_cache[cache_key]
@@ -861,10 +861,10 @@ class STFTCache:
         """
         cache_key = "hpss"
         if cache_key not in self._feature_cache:
-            if self._audio is None:
+            if '_y' not in self._feature_cache:
                 raise ValueError("Original audio not set. Call set_audio(y) first.")
             from .audio_stft_loader import get_harmonic_percussive
-            y_h, y_p = get_harmonic_percussive(self._audio)
+            y_h, y_p = get_harmonic_percussive(self._feature_cache['_y'])
             self._feature_cache[cache_key] = (
                 np.ascontiguousarray(y_h, dtype=np.float32),
                 np.ascontiguousarray(y_p, dtype=np.float32)
@@ -910,10 +910,10 @@ class STFTCache:
         """
         cache_key = f"cqt_{n_bins}_{bins_per_octave}"
         if cache_key not in self._feature_cache:
-            if self._audio is None:
+            if '_y' not in self._feature_cache:
                 raise ValueError("Original audio not set. Call set_audio(y) first.")
             from .audio_stft_loader import get_cqt
-            C = get_cqt(self._audio, self.sr, self.hop_length,
+            C = get_cqt(self._feature_cache['_y'], self.sr, self.hop_length,
                        n_bins=n_bins, bins_per_octave=bins_per_octave)
             self._feature_cache[cache_key] = np.ascontiguousarray(C, dtype=np.float32)
         return self._feature_cache[cache_key]

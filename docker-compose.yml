@@ -131,6 +131,39 @@ services:
       retries: 5
       start_period: 5s
 
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: mood-prometheus
+    restart: unless-stopped
+    user: root
+    entrypoint: ["/bin/sh", "/etc/prometheus/entrypoint.sh"]
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    env_file:
+      - .env
+    environment:
+      - PROMETHEUS_API_KEY=${PROMETHEUS_API_KEY:-}
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus-entrypoint.sh:/etc/prometheus/entrypoint.sh:ro
+      - prometheus_data:/prometheus
+    networks:
+      - app-network
+    depends_on:
+      - bot
+      - worker
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   fluent-bit:
     image: cr.yandex/yc/fluent-bit-plugin-yandex:v2.1.1-fluent-bit-2.1.7
     container_name: mood-fluent-bit
@@ -157,6 +190,8 @@ volumes:
     # Временные загрузки пользователей
   redis_data:
     # Redis persistence (AOF) - очередь задач ARQ
+  prometheus_data:
+    # Prometheus TSDB storage
 
 networks:
   app-network:
