@@ -37,7 +37,7 @@ resource "yandex_monitoring_dashboard" "prometheus_metrics" {
       queries {
         target {
           query     = "arq_queue_depth{queue_name=\"default\"}"
-          text_mode = true
+          text_mode = false
         }
         downsampling {
           grid_aggregation = "GRID_AGGREGATION_AVG"
@@ -76,7 +76,7 @@ resource "yandex_monitoring_dashboard" "prometheus_metrics" {
       queries {
         target {
           query     = "arq_in_progress{queue_name=\"default\"}"
-          text_mode = true
+          text_mode = false
         }
         downsampling {
           grid_aggregation = "GRID_AGGREGATION_AVG"
@@ -115,7 +115,7 @@ resource "yandex_monitoring_dashboard" "prometheus_metrics" {
       queries {
         target {
           query     = "rate(arq_tasks_total[5m])"
-          text_mode = true
+          text_mode = false
         }
         downsampling {
           grid_aggregation = "GRID_AGGREGATION_AVG"
@@ -155,7 +155,7 @@ resource "yandex_monitoring_dashboard" "prometheus_metrics" {
       queries {
         target {
           query     = "memory_usage_bytes{job=\"bot\"}"
-          text_mode = true
+          text_mode = false
         }
         downsampling {
           grid_aggregation = "GRID_AGGREGATION_AVG"
@@ -194,7 +194,7 @@ resource "yandex_monitoring_dashboard" "prometheus_metrics" {
       queries {
         target {
           query     = "memory_usage_bytes{job=\"worker\"}"
-          text_mode = true
+          text_mode = false
         }
         downsampling {
           grid_aggregation = "GRID_AGGREGATION_AVG"
@@ -233,7 +233,7 @@ resource "yandex_monitoring_dashboard" "prometheus_metrics" {
       queries {
         target {
           query     = "rate(process_cpu_seconds_total[5m])"
-          text_mode = true
+          text_mode = false
         }
         downsampling {
           grid_aggregation = "GRID_AGGREGATION_AVG"
@@ -273,7 +273,7 @@ resource "yandex_monitoring_dashboard" "prometheus_metrics" {
       queries {
         target {
           query     = "rate(python_gc_collections_total[5m])"
-          text_mode = true
+          text_mode = false
         }
         downsampling {
           grid_aggregation = "GRID_AGGREGATION_AVG"

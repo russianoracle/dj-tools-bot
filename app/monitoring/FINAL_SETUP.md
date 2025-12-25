@@ -139,12 +139,33 @@ terraform apply -auto-approve
    yc iam service-account get prometheus-writer
    ```
 
-## Следующие шаги
+## ✅ Установка завершена
 
-1. ✅ Дождаться появления метрик в дашбордах (10-15 мин)
-2. ✅ Обновить comprehensive dashboard с правильным PromQL форматом
-3. ✅ Добавить алерты для critical метрик
-4. ✅ Настроить Grafana (опционально, для более гибкой визуализации)
+**Статус:** Все компоненты работают корректно
+
+### Дашборды (активны)
+
+1. **Simple Test Dashboard** (4 виджета - базовые метрики):
+   https://monitoring.yandex.cloud/folders/b1ge0vpe8dp87vc3n73l/monitoring/dashboards/fbedr8rdlmvn6gv2ftlt
+
+2. **Prometheus Metrics Dashboard** (7 виджетов - системные метрики):
+   https://monitoring.yandex.cloud/folders/b1ge0vpe8dp87vc3n73l/monitoring/dashboards/fbe6thc2rlq5006qnhl8
+
+3. **Comprehensive Dashboard** (18 виджетов - все метрики):
+   https://monitoring.yandex.cloud/folders/b1ge0vpe8dp87vc3n73l/monitoring/dashboards/fbec8eu2t9pes36mlq3c
+
+### Что исправлено
+
+1. ✅ ProcessCollector duplication error - убраны дублирующие регистрации (автоматически регистрируются prometheus_client)
+2. ✅ Dashboard query format - все запросы используют PromQL (`text_mode = false`)
+3. ✅ Prometheus remote_write - успешно отправляет метрики в workspace
+4. ✅ Все targets healthy - bot, worker, prometheus
+
+### Следующие шаги (опционально)
+
+1. Добавить алерты для critical метрик (stuck tasks, high memory)
+2. Настроить Grafana для более гибкой визуализации
+3. Добавить retention policy для метрик
 
 ## Полезные команды
 
