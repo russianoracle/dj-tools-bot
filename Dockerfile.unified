@@ -30,6 +30,9 @@ COPY --chown=appuser:appuser app/ ./app/
 # Copy healthcheck script (required for worker healthcheck)
 COPY --chown=appuser:appuser healthcheck_worker.py ./
 
+# Copy production scripts only (monitoring)
+COPY --chown=appuser:appuser scripts/production/ ./scripts/
+
 # Copy models
 COPY --chown=appuser:appuser models/production/ ./models/production/
 

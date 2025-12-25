@@ -289,7 +289,8 @@ class CacheRepository(ICacheStatusProvider):
 
             self._manager.save_dj_profile(
                 profile.dj_name.lower(),
-                profile.to_dict()
+                profile.to_dict(),
+                profile.set_file_paths
             )
             return True
         except Exception as e:

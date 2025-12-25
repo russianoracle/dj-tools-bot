@@ -289,6 +289,11 @@ jobs:
           cp "$CHECKOUT_DIR/healthcheck_worker.py" /home/ubuntu/app/ 2>/dev/null && echo "✅ healthcheck_worker.py" || echo "⚠️  healthcheck_worker.py not found"
           cp "$CHECKOUT_DIR/logging-config.yaml" /home/ubuntu/app/ 2>/dev/null && echo "✅ logging-config.yaml" || echo "⚠️  logging-config.yaml not found"
 
+          # Copy scripts directory (all scripts automatically)
+          mkdir -p /home/ubuntu/app/scripts
+          rsync -av --delete "$CHECKOUT_DIR/scripts/" /home/ubuntu/app/scripts/ 2>/dev/null && echo "✅ scripts/" || echo "⚠️  scripts/ not found"
+          chmod +x /home/ubuntu/app/scripts/*.sh /home/ubuntu/app/scripts/*.py 2>/dev/null || true
+
           # Stop and REMOVE containers to force recreate with new config
           echo "Stopping and removing containers to apply new configuration..."
           docker-compose down --remove-orphans || true
