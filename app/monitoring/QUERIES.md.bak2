@@ -1,0 +1,213 @@
+# Готовые запросы для копирования
+
+Скопируй и вставь в поле "Запрос" в Yandex Cloud Monitoring.
+**Service всегда: `custom`**
+
+---
+
+## Бизнес-метрики (Bot)
+
+### ARQ Queue Depth
+```
+"app.arq_queue_depth"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", queue_name="default"}
+```
+
+### ARQ Tasks In Progress
+```
+"app.arq_in_progress"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", queue_name="default"}
+```
+
+### Bot Memory Usage (MB)
+```
+"app.memory_usage_bytes"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", process="bot"} / 1024 / 1024
+```
+
+### Worker Memory Usage (MB)
+```
+"worker.memory_usage_bytes"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", process="worker"} / 1024 / 1024
+```
+
+### Total App Memory (MB)
+```
+("app.memory_usage_bytes"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", process="bot"} + "worker.memory_usage_bytes"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", process="worker"}) / 1024 / 1024
+```
+
+### App Info
+```
+"app.app_info"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+---
+
+## Системные метрики (VM)
+
+### CPU User %
+```
+"sys.cpu.usage_user"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+### CPU System %
+```
+"sys.cpu.usage_system"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+### CPU IO Wait %
+```
+"sys.cpu.usage_iowait"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+### Memory Usage %
+```
+("sys.memory.used" / "sys.memory.total") * 100
+```
+
+### Memory Available (GB)
+```
+"sys.memory.available" / 1024 / 1024 / 1024
+```
+
+### Swap Usage %
+```
+("sys.memory.swap_used" / "sys.memory.swap_total") * 100
+```
+
+### Disk Usage %
+```
+"sys.storage.usage_percent"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+### Disk Free (GB)
+```
+("sys.storage.total_bytes" - "sys.storage.used_bytes") / 1024 / 1024 / 1024
+```
+
+### Network Sent (MB/s)
+```
+"sys.network.bytes_sent" / 1024 / 1024
+```
+
+### Network Received (MB/s)
+```
+"sys.network.bytes_recv" / 1024 / 1024
+```
+
+### Network Errors (sent)
+```
+"sys.network.errors_sent"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+### Disk Read IOPS
+```
+"sys.io.read_ops"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+### Disk Write IOPS
+```
+"sys.io.write_ops"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+---
+
+## Python процессы
+
+### Bot CPU Usage
+```
+"app.process_cpu_seconds_total"
+```
+
+### Worker CPU Usage
+```
+"worker.process_cpu_seconds_total"
+```
+
+### Bot RSS Memory (MB)
+```
+"app.process_resident_memory_bytes" / 1024 / 1024
+```
+
+### Worker RSS Memory (MB)
+```
+"worker.process_resident_memory_bytes" / 1024 / 1024
+```
+
+### Bot Virtual Memory (MB)
+```
+"app.process_virtual_memory_bytes" / 1024 / 1024
+```
+
+### Python GC Gen 0 (Bot)
+```
+"app.python_gc_collections_total"{generation="0"}
+```
+
+### Python GC Gen 1 (Bot)
+```
+"app.python_gc_collections_total"{generation="1"}
+```
+
+### Python GC Gen 2 (Bot)
+```
+"app.python_gc_collections_total"{generation="2"}
+```
+
+---
+
+## Составные метрики
+
+### Total CPU Usage (User + System)
+```
+"sys.cpu.usage_user" + "sys.cpu.usage_system"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom"}
+```
+
+### Free Memory (GB)
+```
+("sys.memory.total" - "sys.memory.used") / 1024 / 1024 / 1024
+```
+
+### Network Total (MB/s)
+```
+("sys.network.bytes_sent" + "sys.network.bytes_recv") / 1024 / 1024
+```
+
+### Total App CPU
+```
+"app.process_cpu_seconds_total" + "worker.process_cpu_seconds_total"
+```
+
+---
+
+## Как использовать
+
+1. Открой [Dashboards](https://console.yandex.cloud/folders/b1ge0vpe8dp87vc3n73l/monitoring/dashboards)
+2. Создай дашборд → Добавить виджет → График
+3. **Service**: выбери `custom`
+4. **Запрос**: скопируй любой запрос выше
+5. **Название**: укажи имя метрики
+6. Сохранить
+
+---
+
+## Примеры дашбордов
+
+### Минимальный (3 виджета)
+1. **Queue Depth**: `"app.arq_queue_depth"{queue_name="default"}`
+2. **Memory %**: `("sys.memory.used" / "sys.memory.total") * 100`
+3. **CPU %**: `"sys.cpu.usage_user" + "sys.cpu.usage_system"`
+
+### Полный бизнес (6 виджетов)
+1. **Queue Depth**: `"app.arq_queue_depth"{queue_name="default"}`
+2. **Tasks In Progress**: `"app.arq_in_progress"{queue_name="default"}`
+3. **Bot Memory (MB)**: `"app.memory_usage_bytes"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", process="bot"} / 1024 / 1024`
+4. **Worker Memory (MB)**: `"worker.memory_usage_bytes"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", process="worker"} / 1024 / 1024`
+5. **Total App Memory (MB)**: `("app.memory_usage_bytes"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", process="bot"} + "worker.memory_usage_bytes"{folderId = "b1ge0vpe8dp87vc3n73l", service = "custom", process="worker"}) / 1024 / 1024`
+6. **Memory %**: `("sys.memory.used" / "sys.memory.total") * 100`
+
+### Полный системный (8 виджетов)
+1. **CPU User**: `"sys.cpu.usage_user"`
+2. **CPU System**: `"sys.cpu.usage_system"`
+3. **Memory %**: `("sys.memory.used" / "sys.memory.total") * 100`
+4. **Memory Available (GB)**: `"sys.memory.available" / 1024 / 1024 / 1024`
+5. **Disk %**: `"sys.storage.usage_percent"`
+6. **Network Sent (MB/s)**: `"sys.network.bytes_sent" / 1024 / 1024`
+7. **Network Recv (MB/s)**: `"sys.network.bytes_recv" / 1024 / 1024`
+8. **Disk Read IOPS**: `"sys.io.read_ops"`

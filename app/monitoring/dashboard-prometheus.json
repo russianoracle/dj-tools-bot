@@ -1,0 +1,219 @@
+{
+  "name": "DJ Tools Bot - Prometheus Metrics",
+  "description": "Metrics from Prometheus remote_write to Yandex Managed Prometheus",
+  "widgets": [
+    {
+      "position": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "title": "ARQ Queue Depth (Bot)",
+      "description": "Task queue depth from bot instance",
+      "chart": {
+        "id": "queue_depth_bot",
+        "queries": {
+          "targets": [
+            {
+              "query": "arq_queue_depth{job=\"bot\",queue_name=\"default\"}",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        }
+      }
+    },
+    {
+      "position": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "title": "ARQ Queue Depth (Worker)",
+      "description": "Task queue depth from worker instance",
+      "chart": {
+        "id": "queue_depth_worker",
+        "queries": {
+          "targets": [
+            {
+              "query": "arq_queue_depth{job=\"worker\",queue_name=\"default\"}",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        }
+      }
+    },
+    {
+      "position": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "title": "Tasks In Progress",
+      "description": "Number of tasks currently being processed",
+      "chart": {
+        "id": "tasks_in_progress",
+        "queries": {
+          "targets": [
+            {
+              "query": "arq_in_progress{queue_name=\"default\"}",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        }
+      }
+    },
+    {
+      "position": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "title": "Total Tasks Processed",
+      "description": "Cumulative count of processed tasks",
+      "chart": {
+        "id": "tasks_total",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(arq_tasks_total[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        }
+      }
+    },
+    {
+      "position": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "title": "Bot Memory Usage",
+      "description": "Memory consumption of bot process",
+      "chart": {
+        "id": "bot_memory",
+        "queries": {
+          "targets": [
+            {
+              "query": "memory_usage_bytes{job=\"bot\"}",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          },
+          "yaxisSettings": {
+            "unit": "bytes"
+          }
+        }
+      }
+    },
+    {
+      "position": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "title": "Worker Memory Usage",
+      "description": "Memory consumption of worker process",
+      "chart": {
+        "id": "worker_memory",
+        "queries": {
+          "targets": [
+            {
+              "query": "memory_usage_bytes{job=\"worker\"}",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          },
+          "yaxisSettings": {
+            "unit": "bytes"
+          }
+        }
+      }
+    },
+    {
+      "position": {"x": 0, "y": 24, "w": 12, "h": 8},
+      "title": "CPU Usage (Bot)",
+      "description": "CPU time spent by bot process",
+      "chart": {
+        "id": "bot_cpu",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(process_cpu_seconds_total{job=\"bot\"}[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        }
+      }
+    },
+    {
+      "position": {"x": 12, "y": 24, "w": 12, "h": 8},
+      "title": "CPU Usage (Worker)",
+      "description": "CPU time spent by worker process",
+      "chart": {
+        "id": "worker_cpu",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(process_cpu_seconds_total{job=\"worker\"}[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        }
+      }
+    },
+    {
+      "position": {"x": 0, "y": 32, "w": 24, "h": 8},
+      "title": "Python GC Collections",
+      "description": "Garbage collection activity by generation",
+      "chart": {
+        "id": "gc_collections",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(python_gc_collections_total[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        }
+      }
+    }
+  ]
+}

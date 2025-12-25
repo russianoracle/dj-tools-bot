@@ -150,8 +150,8 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/prometheus-entrypoint.sh:/etc/prometheus/entrypoint.sh:ro
+      - ./app/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./app/monitoring/prometheus-entrypoint.sh:/etc/prometheus/entrypoint.sh:ro
       - prometheus_data:/prometheus
     networks:
       - app-network

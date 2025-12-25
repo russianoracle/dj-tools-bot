@@ -1,0 +1,323 @@
+{
+  "name": "DJ Tools Bot - System Metrics",
+  "description": "System metrics: CPU, memory, disk, network, process stats",
+  "widgets": [
+    {
+      "position": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "title": "CPU Usage",
+      "description": "CPU usage percentage (user, system, iowait)",
+      "chart": {
+        "id": "cpu_usage",
+        "queries": {
+          "targets": [
+            {
+              "query": "sys.cpu.usage_user",
+              "hidden": false,
+              "text": "User"
+            },
+            {
+              "query": "sys.cpu.usage_system",
+              "hidden": false,
+              "text": "System"
+            },
+            {
+              "query": "sys.cpu.usage_iowait",
+              "hidden": false,
+              "text": "IO Wait"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "yAxis": {
+            "type": "linear",
+            "min": "0",
+            "max": "100"
+          },
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "title": "Memory Usage",
+      "description": "Memory usage percentage and swap",
+      "chart": {
+        "id": "memory_usage",
+        "queries": {
+          "targets": [
+            {
+              "query": "(sys.memory.used / sys.memory.total) * 100",
+              "hidden": false,
+              "text": "Used %"
+            },
+            {
+              "query": "(sys.memory.swap_used / sys.memory.swap_total) * 100",
+              "hidden": false,
+              "text": "Swap %"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "yAxis": {
+            "type": "linear",
+            "min": "0",
+            "max": "100"
+          },
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "title": "Application Memory (Bot + Worker)",
+      "description": "Memory usage of bot and worker processes",
+      "chart": {
+        "id": "app_memory",
+        "queries": {
+          "targets": [
+            {
+              "query": "memory_usage_bytes{process=\"bot\"}",
+              "hidden": false,
+              "text": "Bot"
+            },
+            {
+              "query": "memory_usage_bytes{process=\"worker\"}",
+              "hidden": false,
+              "text": "Worker"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "title": "Process Resident Memory",
+      "description": "Process RSS memory from Python metrics",
+      "chart": {
+        "id": "process_memory",
+        "queries": {
+          "targets": [
+            {
+              "query": "process_resident_memory_bytes",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "title": "Disk Usage",
+      "description": "Disk usage percentage by mount point",
+      "chart": {
+        "id": "disk_usage",
+        "queries": {
+          "targets": [
+            {
+              "query": "sys.storage.usage_percent",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "yAxis": {
+            "type": "linear",
+            "min": "0",
+            "max": "100"
+          },
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "title": "Disk I/O Operations",
+      "description": "Disk read/write operations per second",
+      "chart": {
+        "id": "disk_iops",
+        "queries": {
+          "targets": [
+            {
+              "query": "sys.io.read_ops",
+              "hidden": false,
+              "text": "Read IOPS"
+            },
+            {
+              "query": "sys.io.write_ops",
+              "hidden": false,
+              "text": "Write IOPS"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 0, "y": 24, "w": 12, "h": 8},
+      "title": "Network Traffic",
+      "description": "Network bytes sent/received per second",
+      "chart": {
+        "id": "network_traffic",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(sys.network.bytes_sent[5m])",
+              "hidden": false,
+              "text": "Sent"
+            },
+            {
+              "query": "rate(sys.network.bytes_recv[5m])",
+              "hidden": false,
+              "text": "Received"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 24, "w": 12, "h": 8},
+      "title": "Network Errors",
+      "description": "Network errors and dropped packets",
+      "chart": {
+        "id": "network_errors",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(sys.network.errors_sent[5m])",
+              "hidden": false,
+              "text": "Errors Sent"
+            },
+            {
+              "query": "rate(sys.network.errors_recv[5m])",
+              "hidden": false,
+              "text": "Errors Received"
+            },
+            {
+              "query": "rate(sys.network.drops_sent[5m])",
+              "hidden": false,
+              "text": "Drops Sent"
+            },
+            {
+              "query": "rate(sys.network.drops_recv[5m])",
+              "hidden": false,
+              "text": "Drops Received"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 0, "y": 32, "w": 12, "h": 8},
+      "title": "Python Garbage Collection",
+      "description": "GC collections by generation",
+      "chart": {
+        "id": "python_gc",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(python_gc_collections_total{generation=\"0\"}[5m])",
+              "hidden": false,
+              "text": "Gen 0"
+            },
+            {
+              "query": "rate(python_gc_collections_total{generation=\"1\"}[5m])",
+              "hidden": false,
+              "text": "Gen 1"
+            },
+            {
+              "query": "rate(python_gc_collections_total{generation=\"2\"}[5m])",
+              "hidden": false,
+              "text": "Gen 2"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 32, "w": 12, "h": 8},
+      "title": "Process CPU Time",
+      "description": "Total CPU seconds consumed by processes",
+      "chart": {
+        "id": "process_cpu",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(process_cpu_seconds_total[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    }
+  ]
+}
