@@ -294,6 +294,10 @@ jobs:
           rsync -av --delete "$CHECKOUT_DIR/scripts/" /home/ubuntu/app/scripts/ 2>/dev/null && echo "✅ scripts/" || echo "⚠️  scripts/ not found"
           chmod +x /home/ubuntu/app/scripts/*.sh /home/ubuntu/app/scripts/*.py 2>/dev/null || true
 
+          # Copy monitoring directory
+          mkdir -p /home/ubuntu/app/monitoring
+          rsync -av --delete "$CHECKOUT_DIR/monitoring/" /home/ubuntu/app/monitoring/ 2>/dev/null && echo "✅ monitoring/" || echo "⚠️  monitoring/ not found"
+
           # Stop and REMOVE containers to force recreate with new config
           echo "Stopping and removing containers to apply new configuration..."
           docker-compose down --remove-orphans || true

@@ -1,0 +1,97 @@
+# Yandex Unified Agent Configuration
+# Collects Linux system metrics + application Prometheus metrics
+# Sends to Yandex Cloud Monitoring
+
+# ============================================================================
+# GLOBAL SETTINGS
+# ============================================================================
+
+status:
+  port: 16241  # Health check endpoint
+
+# ============================================================================
+# STORAGE (Reliability)
+# ============================================================================
+
+storages:
+  - name: main
+    plugin: fs
+    config:
+      directory: /var/lib/yandex/unified_agent/main
+      max_partition_size: 100mb
+      max_segment_size: 10mb
+
+# ============================================================================
+# CHANNELS (Outputs)
+# ============================================================================
+
+channels:
+  - name: yc_monitoring
+    channel:
+      pipe:
+        - storage_ref:
+            name: main
+      output:
+        plugin: yc_metrics
+        config:
+          folder_id: ${FOLDER_ID}  # Set via environment variable
+          iam:
+            cloud_meta: {}  # Use VM metadata for IAM token
+
+# ============================================================================
+# ROUTES (Data Flow)
+# ============================================================================
+
+routes:
+  # Route 1: Linux system metrics (CPU, RAM, disk, network)
+  - input:
+      plugin: linux_metrics
+      config:
+        namespace: sys
+        resources:
+          cpu: basic
+          memory: basic
+          network: basic
+          storage: basic
+          io: basic
+    channel:
+      channel_ref:
+        name: yc_monitoring
+
+  # Route 2: Application metrics from Prometheus endpoint
+  - input:
+      plugin: metrics_pull
+      config:
+        url: http://localhost:8000/metrics  # Bot metrics
+        format:
+          prometheus: {}
+        namespace: app
+    channel:
+      channel_ref:
+        name: yc_monitoring
+
+  # Route 3: Worker metrics from Prometheus endpoint
+  - input:
+      plugin: metrics_pull
+      config:
+        url: http://localhost:8001/metrics  # Worker metrics
+        format:
+          prometheus: {}
+        namespace: worker
+    channel:
+      channel_ref:
+        name: yc_monitoring
+
+  # Route 4: Agent health metrics
+  - input:
+      plugin: agent_metrics
+      config:
+        namespace: ua
+    channel:
+      pipe:
+        - filter:
+            plugin: filter_metrics
+            config:
+              match: "{scope=health}"
+      channel_ref:
+        name: yc_monitoring

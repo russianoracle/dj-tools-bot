@@ -288,6 +288,9 @@ sync-to-deploy:
 	@mkdir -p $(DEPLOY_REPO)/scripts
 	@rsync -av --exclude='__pycache__' --exclude='*.pyc' scripts/ $(DEPLOY_REPO)/scripts/
 	@chmod +x $(DEPLOY_REPO)/scripts/*.sh $(DEPLOY_REPO)/scripts/*.py 2>/dev/null || true
+	@echo "  → Copying monitoring/"
+	@mkdir -p $(DEPLOY_REPO)/monitoring
+	@rsync -av monitoring/ $(DEPLOY_REPO)/monitoring/
 	@echo "✅ Files synced to $(DEPLOY_REPO)"
 
 # Cancel running GitHub Actions workflows before deploy

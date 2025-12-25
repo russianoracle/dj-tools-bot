@@ -1,0 +1,37 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'mood-classifier'
+    env: 'production'
+
+scrape_configs:
+  - job_name: 'bot'
+    static_configs:
+      - targets: ['bot:8000']
+        labels:
+          service: 'mood-classifier-bot'
+          process: 'bot'
+
+  - job_name: 'worker'
+    static_configs:
+      - targets: ['worker:8001']
+        labels:
+          service: 'mood-classifier-worker'
+          process: 'worker'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+remote_write:
+  - url: 'https://monitoring.api.cloud.yandex.net/prometheus/workspaces/monhr2m0jl118pvk9mtu/api/v1/write'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/api_key.txt
+    queue_config:
+      max_samples_per_send: 2000
+      min_backoff: 100ms
+      max_backoff: 15s
+    metadata_config:
+      send: false

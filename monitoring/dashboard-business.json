@@ -1,0 +1,244 @@
+{
+  "name": "DJ Tools Bot - Business Metrics",
+  "description": "Business metrics: queue, cache, analysis performance, detections",
+  "widgets": [
+    {
+      "position": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "title": "ARQ Queue Depth",
+      "description": "Current task queue depth (tasks waiting to be processed)",
+      "chart": {
+        "id": "queue_depth",
+        "queries": {
+          "targets": [
+            {
+              "query": "arq_queue_depth{queue_name=\"default\"}",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "title": "ARQ Tasks In Progress",
+      "description": "Number of tasks currently being processed",
+      "chart": {
+        "id": "tasks_in_progress",
+        "queries": {
+          "targets": [
+            {
+              "query": "arq_in_progress{queue_name=\"default\"}",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 0, "y": 8, "w": 24, "h": 10},
+      "title": "Analysis Duration (p50, p95, p99)",
+      "description": "Track analysis duration percentiles",
+      "chart": {
+        "id": "analysis_duration",
+        "queries": {
+          "targets": [
+            {
+              "query": "histogram_quantile(0.5, rate(analysis_duration_seconds_bucket[5m]))",
+              "hidden": false,
+              "text": "p50"
+            },
+            {
+              "query": "histogram_quantile(0.95, rate(analysis_duration_seconds_bucket[5m]))",
+              "hidden": false,
+              "text": "p95"
+            },
+            {
+              "query": "histogram_quantile(0.99, rate(analysis_duration_seconds_bucket[5m]))",
+              "hidden": false,
+              "text": "p99"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 0, "y": 18, "w": 12, "h": 8},
+      "title": "Cache Hit Rate",
+      "description": "Percentage of cache hits vs total get operations",
+      "chart": {
+        "id": "cache_hit_rate",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(cache_operations_total{operation=\"get\",result=\"hit\"}[5m]) / rate(cache_operations_total{operation=\"get\"}[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "yAxis": {
+            "type": "linear",
+            "min": "0",
+            "max": "1"
+          },
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 18, "w": 12, "h": 8},
+      "title": "Cache Operations Rate",
+      "description": "Cache operations per second by type",
+      "chart": {
+        "id": "cache_ops_rate",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(cache_operations_total{result=\"hit\"}[5m])",
+              "hidden": false,
+              "text": "Hits"
+            },
+            {
+              "query": "rate(cache_operations_total{result=\"miss\"}[5m])",
+              "hidden": false,
+              "text": "Misses"
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 0, "y": 26, "w": 12, "h": 8},
+      "title": "Drops Detected by Zone",
+      "description": "Total drops detected in each energy zone",
+      "chart": {
+        "id": "drops_detected",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(drops_detected_total[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 26, "w": 12, "h": 8},
+      "title": "Transitions Detected",
+      "description": "Zone transitions detected over time",
+      "chart": {
+        "id": "transitions_detected",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(transitions_detected_total[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 0, "y": 34, "w": 12, "h": 8},
+      "title": "Processing Error Rate",
+      "description": "Errors per minute by stage",
+      "chart": {
+        "id": "error_rate",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(processing_errors_total[5m]) * 60",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    },
+    {
+      "position": {"x": 12, "y": 34, "w": 12, "h": 8},
+      "title": "Telegram Requests Rate",
+      "description": "Bot requests per second by command",
+      "chart": {
+        "id": "telegram_requests",
+        "queries": {
+          "targets": [
+            {
+              "query": "rate(telegram_requests_total[5m])",
+              "hidden": false
+            }
+          ]
+        },
+        "visualizationSettings": {
+          "type": "line",
+          "showLegend": true,
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "seriesOverrides": []
+      }
+    }
+  ]
+}
