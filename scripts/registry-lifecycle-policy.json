@@ -1,0 +1,13 @@
+[
+  {
+    "description": "Delete untagged images immediately",
+    "expire_period": "24h",
+    "untagged": true
+  },
+  {
+    "description": "Keep only last 3 SHA-tagged images (excluding latest)",
+    "tag_regexp": "^(?!latest$).*",
+    "retained_top": 3,
+    "expire_period": "48h"
+  }
+]

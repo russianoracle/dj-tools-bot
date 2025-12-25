@@ -64,14 +64,14 @@ setup_exception_handler(logger)
 # ============================================================================
 
 
-def download_audio(url: str, output_template: str, max_retries: int = 5) -> str:
+def download_audio(url: str, output_template: str, max_retries: int = None) -> str:
     """
     Download audio using yt-dlp via NAT Gateway with retry logic.
 
     Args:
         url: Audio URL (SoundCloud, YouTube, etc.)
         output_template: Output path template with %(ext)s
-        max_retries: Maximum number of retry attempts (default: 5)
+        max_retries: Maximum number of retry attempts (default: from settings)
 
     Returns:
         Path to downloaded file (without extension placeholder)
@@ -79,12 +79,18 @@ def download_audio(url: str, output_template: str, max_retries: int = 5) -> str:
     Raises:
         Exception if download fails after all retries
     """
+    from app.core.config import get_settings
+    settings = get_settings()
+
+    if max_retries is None:
+        max_retries = settings.download_max_retries
+
     last_error = None
 
     for attempt in range(max_retries):
         try:
             if attempt > 0:
-                backoff_time = min(2 ** attempt, 30)  # Exponential backoff, max 30s
+                backoff_time = min(settings.download_backoff_base ** attempt, settings.download_backoff_max)
                 logger.info(f"Retry attempt {attempt + 1}/{max_retries} after {backoff_time}s", data={
                     "url": url[:100],
                     "attempt": attempt + 1,
@@ -102,15 +108,15 @@ def download_audio(url: str, output_template: str, max_retries: int = 5) -> str:
                 "-o", output_template,
                 "--max-filesize", "500M",
                 "--no-warnings",
-                "--socket-timeout", "90",  # Increased from 60s
+                "--socket-timeout", "90",
                 # Geo-bypass options
                 "--geo-bypass",
                 "--geo-bypass-country", "US",
                 # User-agent to avoid bot detection
                 "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
                 # Retry on network errors (yt-dlp internal retries)
-                "--retries", "5",  # Increased from 3
-                "--fragment-retries", "5",  # Increased from 3
+                "--retries", str(settings.ytdlp_retries),
+                "--fragment-retries", str(settings.ytdlp_fragment_retries),
                 # Add network error handling
                 "--abort-on-error",
                 url,
@@ -690,7 +696,7 @@ class WorkerSettings:
 
     # Health check settings - don't mark jobs as failed during long operations
     health_check_interval = 300  # 5 minutes between health checks
-    max_tries = 1                # Don't retry failed jobs automatically
+    max_tries = int(os.getenv("ARQ_MAX_TRIES", "1"))  # Configurable retry policy
 
     # Graceful shutdown - allow jobs to finish
     allow_abort_jobs = False

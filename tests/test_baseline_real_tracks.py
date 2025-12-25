@@ -46,7 +46,7 @@ class TestRealTrackFeatureExtraction:
         if not PIONEER_DEMO_1.exists():
             pytest.skip(f"Demo track not found: {PIONEER_DEMO_1}")
 
-        from app.core.tasks.base import AudioContext
+        from app.modules.analysis.tasks.base import AudioContext
         from app.common.primitives import compute_stft
 
         y, sr = audio_loader.load(str(PIONEER_DEMO_1))
@@ -65,7 +65,7 @@ class TestRealTrackFeatureExtraction:
         if not PIONEER_DEMO_2.exists():
             pytest.skip(f"Demo track not found: {PIONEER_DEMO_2}")
 
-        from app.core.tasks.base import AudioContext
+        from app.modules.analysis.tasks.base import AudioContext
         from app.common.primitives import compute_stft
 
         y, sr = audio_loader.load(str(PIONEER_DEMO_2))
@@ -267,7 +267,7 @@ class TestRealTrackTasks:
             pytest.skip(f"Demo track not found: {PIONEER_DEMO_1}")
 
         from app.core.adapters.loader import AudioLoader
-        from app.core.tasks.base import AudioContext
+        from app.modules.analysis.tasks.base import AudioContext
         from app.common.primitives import compute_stft
 
         loader = AudioLoader()
@@ -322,7 +322,7 @@ class TestBaselineCapture:
             pytest.skip(f"Demo track not found: {PIONEER_DEMO_1}")
 
         from app.core.adapters.loader import AudioLoader
-        from app.core.tasks.base import AudioContext
+        from app.modules.analysis.tasks.base import AudioContext
         from app.common.primitives import compute_stft
 
         loader = AudioLoader()

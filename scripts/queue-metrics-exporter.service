@@ -1,0 +1,20 @@
+[Unit]
+Description=ARQ Queue Metrics Exporter to YC Monitoring
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/app
+Environment="YC_FOLDER_ID=b1ge0vpe8dp87vc3n73l"
+Environment="REDIS_HOST=redis"
+Environment="REDIS_PORT=6379"
+ExecStart=/usr/bin/docker exec app python scripts/export_queue_metrics.py --loop 60
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

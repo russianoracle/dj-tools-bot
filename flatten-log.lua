@@ -2,11 +2,9 @@
 function flatten_log(tag, timestamp, record)
     local log = record["log"]
 
-    -- If log is empty or nil, set default message
+    -- If log is empty or nil, drop the record
     if not log or (type(log) == "string" and log:match("^%s*$")) then
-        record["log"] = "[Empty log]"
-        record["log_level"] = "INFO"
-        return 2, timestamp, record
+        return -1, timestamp, record
     end
 
     -- If log is a map/table with nested fields, flatten it

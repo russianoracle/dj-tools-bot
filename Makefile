@@ -286,9 +286,8 @@ sync-to-deploy:
 	@cp Makefile $(DEPLOY_REPO)/ || true
 	@echo "  → Copying scripts/"
 	@mkdir -p $(DEPLOY_REPO)/scripts
-	@cp scripts/fetch-secrets.sh $(DEPLOY_REPO)/scripts/ || true
-	@cp scripts/graceful-deploy.sh $(DEPLOY_REPO)/scripts/ || true
-	@chmod +x $(DEPLOY_REPO)/scripts/*.sh 2>/dev/null || true
+	@rsync -av --exclude='__pycache__' --exclude='*.pyc' scripts/ $(DEPLOY_REPO)/scripts/
+	@chmod +x $(DEPLOY_REPO)/scripts/*.sh $(DEPLOY_REPO)/scripts/*.py 2>/dev/null || true
 	@echo "✅ Files synced to $(DEPLOY_REPO)"
 
 # Cancel running GitHub Actions workflows before deploy

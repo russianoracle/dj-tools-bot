@@ -224,15 +224,17 @@ class TestGitCompatibility:
 
     def test_git_clone_depth(self):
         """Test git clone --depth works on all platforms."""
-        # This is used in deploy.sh line 23
-        # Just test that the option is recognized
+        # This is used in deploy.sh line 243 and scripts/deploy_to_bot.sh line 71
+        # Test that --depth option is recognized (non-zero exit but option parsed)
         result = subprocess.run(
-            ["git", "clone", "--help"],
+            ["git", "clone", "--depth", "1"],
             capture_output=True,
             text=True,
         )
 
-        assert "--depth" in result.stdout
+        # Should fail with usage error (missing repo), not "unknown option"
+        assert "unknown option" not in result.stderr.lower()
+        assert "unrecognized option" not in result.stderr.lower()
 
     def test_git_config(self, tmp_path):
         """Test git config works on all platforms."""

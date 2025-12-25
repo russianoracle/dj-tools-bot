@@ -80,6 +80,28 @@ class Settings:
         default_factory=lambda: int(os.getenv("WORKERS", "4"))
     )
 
+    # Download retry policy
+    download_max_retries: int = field(
+        default_factory=lambda: int(os.getenv("DOWNLOAD_MAX_RETRIES", "5"))
+    )
+    download_backoff_base: int = field(
+        default_factory=lambda: int(os.getenv("DOWNLOAD_BACKOFF_BASE", "2"))
+    )
+    download_backoff_max: int = field(
+        default_factory=lambda: int(os.getenv("DOWNLOAD_BACKOFF_MAX", "30"))
+    )
+    ytdlp_retries: int = field(
+        default_factory=lambda: int(os.getenv("YTDLP_RETRIES", "5"))
+    )
+    ytdlp_fragment_retries: int = field(
+        default_factory=lambda: int(os.getenv("YTDLP_FRAGMENT_RETRIES", "5"))
+    )
+
+    # ARQ worker retry policy
+    arq_max_tries: int = field(
+        default_factory=lambda: int(os.getenv("ARQ_MAX_TRIES", "1"))
+    )
+
 
 # Singleton instance
 _settings: Optional[Settings] = None
