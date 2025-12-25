@@ -89,6 +89,7 @@ class TestConfigIntegrity:
         # These vars are OK to not be in .env.example (runtime-only)
         ALLOWED_UNDOCUMENTED = {
             "ENV",  # Runtime environment indicator
+            "TELEGRAM_BOT_TOKEN",  # Intentionally commented in .env.example (security)
         }
 
         missing_vars = settings_vars - env_example_vars.keys() - ALLOWED_UNDOCUMENTED
@@ -149,6 +150,7 @@ class TestConfigIntegrity:
             "REGISTRY", "REGISTRY_ID", "TAG",  # Image tags
             "REQUIRE_SECRETS",  # Runtime flag
             "METRICS_PORT", "METRICS_UPDATE_INTERVAL", "PROCESS_NAME",  # Metrics
+            "DATA_DIR", "YC_FOLDER_ID", "PROMETHEUS_API_KEY",  # Intentionally commented in .env.example
         }
 
         all_documented = settings_vars | env_example_vars.keys() | DOCKER_ONLY_VARS
