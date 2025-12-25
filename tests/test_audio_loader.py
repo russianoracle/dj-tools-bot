@@ -19,12 +19,10 @@ from typing import Tuple
 import tempfile
 import soundfile as sf
 
-from app.core.adapters.loader import load_audio
+from app.core.adapters.loader import load_audio, AudioLoader
 
 
-# Skip most tests - they use an AudioLoader class that no longer exists
-# The current API is just load_audio() function
-pytestmark = pytest.mark.skip(reason="Tests need refactoring for load_audio() function API")
+# Tests refactored to use SimpleAudioLoader wrapper around load_audio() function
 
 
 # =============================================================================
@@ -33,11 +31,29 @@ pytestmark = pytest.mark.skip(reason="Tests need refactoring for load_audio() fu
 
 
 class SimpleAudioLoader:
-    """Simple wrapper around load_audio for backward-compatible testing."""
+    """Simple wrapper around AudioLoader for backward-compatible testing."""
 
-    def load(self, path, sr=22050, offset=0.0, duration=None):
+    def __init__(self, sample_rate=22050):
+        self._loader = AudioLoader(sample_rate=sample_rate)
+        self.sample_rate = sample_rate
+
+    def load(self, path, sr=None, offset=0.0, duration=None):
         """Load audio file."""
-        return load_audio(path, sr=sr, offset=offset, duration=duration)
+        if sr is None:
+            sr = self.sample_rate
+        return self._loader.load(path, duration=duration, offset=offset)
+
+    def get_duration(self, path):
+        """Get audio file duration."""
+        return self._loader.get_duration(path)
+
+    def validate_file(self, path):
+        """Validate audio file."""
+        return self._loader.validate_file(path)
+
+    def is_supported_format(self, path):
+        """Check if format is supported."""
+        return self._loader.is_supported_format(path)
 
 
 @pytest.fixture
@@ -458,6 +474,7 @@ class TestAudioLoaderRegression:
 # AudioSaver tests
 # =============================================================================
 
+@pytest.mark.skip(reason="AudioSaver class no longer exists - removed from codebase")
 class TestAudioSaver:
     """Tests for AudioSaver class."""
 

@@ -26,7 +26,7 @@ class AudioLoader:
     Uses centralized audio_stft_loader for all librosa operations.
     """
 
-    SUPPORTED_FORMATS = {'.mp3', '.wav', '.flac', '.m4a', '.mp4', '.ogg'}
+    SUPPORTED_FORMATS = {'.mp3', '.wav', '.flac', '.m4a', '.mp4', '.ogg', '.opus'}
 
     def __init__(self, sample_rate: int = 22050):
         """
