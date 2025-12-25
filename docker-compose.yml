@@ -164,6 +164,38 @@ services:
       timeout: 10s
       retries: 3
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mood-grafana
+    restart: unless-stopped
+    user: root
+    entrypoint: ["/entrypoint-wrapper.sh"]
+    env_file:
+      - .env
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=http://158.160.122.216:3000
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - PROMETHEUS_API_KEY=${PROMETHEUS_API_KEY:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml
+      - ./monitoring/grafana/provisioning/datasources/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
+      - ./monitoring/grafana/provisioning/dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - app-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   fluent-bit:
     image: cr.yandex/yc/fluent-bit-plugin-yandex:v2.1.1-fluent-bit-2.1.7
     container_name: mood-fluent-bit
@@ -192,6 +224,8 @@ volumes:
     # Redis persistence (AOF) - очередь задач ARQ
   prometheus_data:
     # Prometheus TSDB storage
+  grafana_data:
+    # Grafana dashboards and settings
 
 networks:
   app-network:
