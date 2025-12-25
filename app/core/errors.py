@@ -146,3 +146,27 @@ class DownloadError(ExternalServiceError):
 class RedisError(ExternalServiceError):
     """Error communicating with Redis."""
     pass
+
+
+# Feature extraction errors
+class FeatureExtractionError(MoodClassifierError):
+    """Error during feature extraction."""
+    pass
+
+
+# Metadata errors
+class MetadataError(MoodClassifierError):
+    """Error reading/writing metadata."""
+    pass
+
+
+# File system errors
+class FileSystemError(MoodClassifierError):
+    """Error accessing file system."""
+    pass
+
+
+# Validation errors
+class ValidationError(MoodClassifierError):
+    """Error validating input data."""
+    pass

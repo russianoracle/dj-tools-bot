@@ -27,7 +27,7 @@ from .base import (
     Pipeline, PipelineContext, PipelineStage,
     LoadAudioStage, ComputeSTFTStage
 )
-from .cache_manager import CacheManager
+from app.core.cache import CacheRepository
 from app.modules.analysis.tasks import (
     FeatureExtractionTask,
     DropDetectionTask,
@@ -855,7 +855,7 @@ class SetBatchAnalyzer:
             cache_dir: Директория для кэша (predictions.db)
             sr: Sample rate для анализа
         """
-        self.cache_manager = CacheManager(cache_dir)
+        self.cache_repo = CacheRepository.get_instance()
         self.sr = sr
 
     def analyze_sets(
@@ -897,7 +897,7 @@ class SetBatchAnalyzer:
         # Vectorized: check cache status for all paths at once
         if not force:
             cache_hits = np.array([
-                self.cache_manager.get_set_analysis(p) for p in abs_paths
+                self.cache_repo.get_set(p) for p in abs_paths
             ], dtype=object)
             cached_mask = np.array([c is not None for c in cache_hits])
         else:
