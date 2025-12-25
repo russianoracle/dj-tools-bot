@@ -183,6 +183,129 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
   }
 
   # ============================================================================
+  # SECTION 2.5: USER METRICS
+  # ============================================================================
+
+  # Title: User Activity
+  widgets {
+    title {
+      text = "USER ACTIVITY"
+      size = "TITLE_SIZE_M"
+    }
+    position { x = 0; y = 20; w = 24; h = 1 }
+  }
+
+  # Unique Active Users (24h)
+  widgets {
+    chart {
+      title          = "Unique Active Users (24h)"
+      chart_id       = "unique_users"
+      display_legend = false
+      queries {
+        target {
+          query     = "unique_users_total"
+          text_mode = true
+        }
+        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+      }
+      visualization_settings {
+        type        = "VISUALIZATION_TYPE_LINE"
+        interpolate = "INTERPOLATE_LINEAR"
+        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+      }
+    }
+    position { x = 0; y = 21; w = 8; h = 6 }
+  }
+
+  # User Request Rate
+  widgets {
+    chart {
+      title          = "User Requests (per minute)"
+      chart_id       = "user_requests_rate"
+      display_legend = true
+      queries {
+        target {
+          query     = "rate(user_requests_total[5m]) * 60"
+          text_mode = true
+        }
+        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+      }
+      visualization_settings {
+        type        = "VISUALIZATION_TYPE_LINE"
+        interpolate = "INTERPOLATE_LINEAR"
+        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+      }
+    }
+    position { x = 8; y = 21; w = 8; h = 6 }
+  }
+
+  # Active Sessions
+  widgets {
+    chart {
+      title          = "Active User Sessions"
+      chart_id       = "active_sessions"
+      display_legend = false
+      queries {
+        target {
+          query     = "user_active_sessions"
+          text_mode = true
+        }
+        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+      }
+      visualization_settings {
+        type        = "VISUALIZATION_TYPE_LINE"
+        interpolate = "INTERPOLATE_LINEAR"
+        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+      }
+    }
+    position { x = 16; y = 21; w = 8; h = 6 }
+  }
+
+  # Top Users by Tracks Analyzed
+  widgets {
+    chart {
+      title          = "Top 5 Users (tracks analyzed)"
+      chart_id       = "top_users_tracks"
+      display_legend = true
+      queries {
+        target {
+          query     = "topk(5, sum by (user_id) (user_tracks_analyzed_total))"
+          text_mode = true
+        }
+        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+      }
+      visualization_settings {
+        type        = "VISUALIZATION_TYPE_COLUMN"
+        interpolate = "INTERPOLATE_LINEAR"
+        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+      }
+    }
+    position { x = 0; y = 27; w = 12; h = 6 }
+  }
+
+  # User Error Rate
+  widgets {
+    chart {
+      title          = "User Errors (per hour)"
+      chart_id       = "user_errors"
+      display_legend = true
+      queries {
+        target {
+          query     = "rate(user_errors_total[5m]) * 3600"
+          text_mode = true
+        }
+        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+      }
+      visualization_settings {
+        type        = "VISUALIZATION_TYPE_LINE"
+        interpolate = "INTERPOLATE_LINEAR"
+        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+      }
+    }
+    position { x = 12; y = 27; w = 12; h = 6 }
+  }
+
+  # ============================================================================
   # SECTION 3: OPERATIONS (REALTIME)
   # ============================================================================
 
@@ -192,7 +315,7 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
       text = "OPERATIONS & HEALTH (REALTIME)"
       size = "TITLE_SIZE_L"
     }
-    position { x = 0; y = 20; w = 24; h = 1 }
+    position { x = 0; y = 33; w = 24; h = 1 }
   }
 
   # ARQ Queue Depth (CRITICAL)
@@ -212,10 +335,9 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
         yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
-        # Add threshold line at 10
       }
     }
-    position { x = 0; y = 21; w = 8; h = 6 }
+    position { x = 0; y = 34; w = 8; h = 6 }
   }
 
   # Tasks In Progress
@@ -237,7 +359,7 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
         yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
       }
     }
-    position { x = 8; y = 21; w = 8; h = 6 }
+    position { x = 8; y = 34; w = 8; h = 6 }
   }
 
   # Stuck Tasks (NEW)
@@ -259,7 +381,7 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
         yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
       }
     }
-    position { x = 16; y = 21; w = 8; h = 6 }
+    position { x = 16; y = 34; w = 8; h = 6 }
   }
 
   # Oldest Task Age (NEW)
@@ -281,7 +403,7 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
         yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
       }
     }
-    position { x = 0; y = 27; w = 12; h = 6 }
+    position { x = 0; y = 40; w = 12; h = 6 }
   }
 
   # Worker Health (NEW)
@@ -303,7 +425,7 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
         yaxis_settings { left { min = "0"; max = "1"; unit_format = "UNIT_NONE" } }
       }
     }
-    position { x = 12; y = 27; w = 12; h = 6 }
+    position { x = 12; y = 40; w = 12; h = 6 }
   }
 
   # Task Timeout Rate
@@ -325,7 +447,7 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
         yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
       }
     }
-    position { x = 0; y = 33; w = 12; h = 6 }
+    position { x = 0; y = 46; w = 12; h = 6 }
   }
 
   # Last Heartbeat (seconds ago)
@@ -347,7 +469,7 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
         yaxis_settings { left { min = "0"; unit_format = "UNIT_SECONDS" } }
       }
     }
-    position { x = 12; y = 33; w = 12; h = 6 }
+    position { x = 12; y = 46; w = 12; h = 6 }
   }
 }
 

@@ -173,6 +173,44 @@ analysis_requests_per_hour = Gauge(
     'Analysis requests per hour (rolling average)'
 )
 
+# User activity metrics
+user_requests_total = Counter(
+    'user_requests_total',
+    'Total requests by user',
+    ['user_id', 'command']
+)
+
+user_tracks_analyzed_total = Counter(
+    'user_tracks_analyzed_total',
+    'Total tracks analyzed per user',
+    ['user_id']
+)
+
+user_active_sessions = Gauge(
+    'user_active_sessions',
+    'Number of active user sessions'
+)
+
+user_last_activity_timestamp = Gauge(
+    'user_last_activity_timestamp',
+    'Timestamp of user last activity',
+    ['user_id']
+)
+
+# User behavior
+user_avg_track_duration = Histogram(
+    'user_avg_track_duration',
+    'Average duration of tracks submitted by users',
+    ['user_id'],
+    buckets=[60, 180, 300, 600, 1200, 1800, 3600]
+)
+
+user_errors_total = Counter(
+    'user_errors_total',
+    'Total errors per user',
+    ['user_id', 'error_type']
+)
+
 # =============================================================================
 # Operational Metrics (для эксплуатации)
 # =============================================================================
