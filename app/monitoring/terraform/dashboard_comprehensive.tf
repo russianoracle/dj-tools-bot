@@ -12,7 +12,12 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
       text = "SYSTEM RESOURCES"
       size = "TITLE_SIZE_L"
     }
-    position { x = 0; y = 0; w = 24; h = 1 }
+    position {
+      x = 0
+      y = 0
+      w = 24
+      h = 1
+    }
   }
 
   # CPU Usage
@@ -26,15 +31,29 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "rate(process_cpu_seconds_total[5m]) * 100"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; max = "100"; unit_format = "UNIT_PERCENT" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            max         = "100"
+            unit_format = "UNIT_PERCENT"
+          }
+        }
       }
     }
-    position { x = 0; y = 1; w = 8; h = 6 }
+    position {
+      x = 0
+      y = 1
+      w = 8
+      h = 6
+    }
   }
 
   # Memory Usage (RSS)
@@ -48,15 +67,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "process_resident_memory_bytes"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_BYTES_SI" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_BYTES_SI"
+          }
+        }
       }
     }
-    position { x = 8; y = 1; w = 8; h = 6 }
+    position {
+      x = 8
+      y = 1
+      w = 8
+      h = 6
+    }
   }
 
   # Python GC Activity
@@ -70,15 +102,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "rate(python_gc_collections_total[1m])"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 16; y = 1; w = 8; h = 6 }
+    position {
+      x = 16
+      y = 1
+      w = 8
+      h = 6
+    }
   }
 
   # ============================================================================
@@ -91,7 +136,12 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
       text = "BUSINESS METRICS"
       size = "TITLE_SIZE_L"
     }
-    position { x = 0; y = 7; w = 24; h = 1 }
+    position {
+      x = 0
+      y = 7
+      w = 24
+      h = 1
+    }
   }
 
   # Track Analysis Rate
@@ -105,15 +155,29 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "rate(arq_tasks_total{status=\"success\"}[5m]) * 60"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE"; title = "tracks/min" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+            title       = "tracks/min"
+          }
+        }
       }
     }
-    position { x = 0; y = 8; w = 12; h = 6 }
+    position {
+      x = 0
+      y = 8
+      w = 12
+      h = 6
+    }
   }
 
   # Cache Hit Rate
@@ -127,15 +191,29 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "(rate(cache_operations_total{result=\"hit\"}[5m]) / (rate(cache_operations_total{result=\"hit\"}[5m]) + rate(cache_operations_total{result=\"miss\"}[5m]))) * 100"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; max = "100"; unit_format = "UNIT_PERCENT" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            max         = "100"
+            unit_format = "UNIT_PERCENT"
+          }
+        }
       }
     }
-    position { x = 12; y = 8; w = 12; h = 6 }
+    position {
+      x = 12
+      y = 8
+      w = 12
+      h = 6
+    }
   }
 
   # Analysis Duration (p95)
@@ -149,15 +227,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "histogram_quantile(0.95, rate(analysis_duration_seconds_bucket[5m]))"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_SECONDS" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_SECONDS"
+          }
+        }
       }
     }
-    position { x = 0; y = 14; w = 12; h = 6 }
+    position {
+      x = 0
+      y = 14
+      w = 12
+      h = 6
+    }
   }
 
   # Error Rate
@@ -171,15 +262,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "rate(processing_errors_total[5m]) * 60"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 12; y = 14; w = 12; h = 6 }
+    position {
+      x = 12
+      y = 14
+      w = 12
+      h = 6
+    }
   }
 
   # ============================================================================
@@ -192,7 +296,12 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
       text = "USER ACTIVITY"
       size = "TITLE_SIZE_M"
     }
-    position { x = 0; y = 20; w = 24; h = 1 }
+    position {
+      x = 0
+      y = 20
+      w = 24
+      h = 1
+    }
   }
 
   # Unique Active Users (24h)
@@ -206,15 +315,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "unique_users_total"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MAX"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 0; y = 21; w = 8; h = 6 }
+    position {
+      x = 0
+      y = 21
+      w = 8
+      h = 6
+    }
   }
 
   # User Request Rate
@@ -228,15 +350,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "rate(user_requests_total[5m]) * 60"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 8; y = 21; w = 8; h = 6 }
+    position {
+      x = 8
+      y = 21
+      w = 8
+      h = 6
+    }
   }
 
   # Active Sessions
@@ -250,15 +385,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "user_active_sessions"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MAX"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 16; y = 21; w = 8; h = 6 }
+    position {
+      x = 16
+      y = 21
+      w = 8
+      h = 6
+    }
   }
 
   # Top Users by Tracks Analyzed
@@ -272,15 +420,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "topk(5, sum by (user_id) (user_tracks_analyzed_total))"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MAX"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_COLUMN"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 0; y = 27; w = 12; h = 6 }
+    position {
+      x = 0
+      y = 27
+      w = 12
+      h = 6
+    }
   }
 
   # User Error Rate
@@ -294,15 +455,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "rate(user_errors_total[5m]) * 3600"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 12; y = 27; w = 12; h = 6 }
+    position {
+      x = 12
+      y = 27
+      w = 12
+      h = 6
+    }
   }
 
   # ============================================================================
@@ -315,7 +489,12 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
       text = "OPERATIONS & HEALTH (REALTIME)"
       size = "TITLE_SIZE_L"
     }
-    position { x = 0; y = 33; w = 24; h = 1 }
+    position {
+      x = 0
+      y = 33
+      w = 24
+      h = 1
+    }
   }
 
   # ARQ Queue Depth (CRITICAL)
@@ -329,15 +508,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "arq_queue_depth{queue_name=\"default\"}"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MAX"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 0; y = 34; w = 8; h = 6 }
+    position {
+      x = 0
+      y = 34
+      w = 8
+      h = 6
+    }
   }
 
   # Tasks In Progress
@@ -351,15 +543,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "arq_in_progress{queue_name=\"default\"}"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MAX"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 8; y = 34; w = 8; h = 6 }
+    position {
+      x = 8
+      y = 34
+      w = 8
+      h = 6
+    }
   }
 
   # Stuck Tasks (NEW)
@@ -373,15 +578,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "stuck_tasks_total"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MAX"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 16; y = 34; w = 8; h = 6 }
+    position {
+      x = 16
+      y = 34
+      w = 8
+      h = 6
+    }
   }
 
   # Oldest Task Age (NEW)
@@ -395,15 +613,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "oldest_task_age_seconds / 60"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MAX"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 0; y = 40; w = 12; h = 6 }
+    position {
+      x = 0
+      y = 40
+      w = 12
+      h = 6
+    }
   }
 
   # Worker Health (NEW)
@@ -417,15 +648,29 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "worker_healthy"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MIN"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MIN"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; max = "1"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            max         = "1"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 12; y = 40; w = 12; h = 6 }
+    position {
+      x = 12
+      y = 40
+      w = 12
+      h = 6
+    }
   }
 
   # Task Timeout Rate
@@ -439,15 +684,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "rate(task_timeouts_total[5m]) * 3600"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_AVG"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_AVG"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_NONE" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_NONE"
+          }
+        }
       }
     }
-    position { x = 0; y = 46; w = 12; h = 6 }
+    position {
+      x = 0
+      y = 46
+      w = 12
+      h = 6
+    }
   }
 
   # Last Heartbeat (seconds ago)
@@ -461,15 +719,28 @@ resource "yandex_monitoring_dashboard" "comprehensive" {
           query     = "time() - last_heartbeat_timestamp"
           text_mode = true
         }
-        downsampling { grid_aggregation = "GRID_AGGREGATION_MAX"; max_points = 1000 }
+        downsampling {
+          grid_aggregation = "GRID_AGGREGATION_MAX"
+          max_points       = 1000
+        }
       }
       visualization_settings {
         type        = "VISUALIZATION_TYPE_LINE"
         interpolate = "INTERPOLATE_LINEAR"
-        yaxis_settings { left { min = "0"; unit_format = "UNIT_SECONDS" } }
+        yaxis_settings {
+          left {
+            min         = "0"
+            unit_format = "UNIT_SECONDS"
+          }
+        }
       }
     }
-    position { x = 12; y = 46; w = 12; h = 6 }
+    position {
+      x = 12
+      y = 46
+      w = 12
+      h = 6
+    }
   }
 }
 
