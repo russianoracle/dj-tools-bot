@@ -1,17 +1,14 @@
 apiVersion: 1
 
 datasources:
-  - name: Yandex Prometheus Workspace
+  - name: Prometheus
     type: prometheus
     access: proxy
-    url: https://monitoring.api.cloud.yandex.net/prometheus/workspaces/monhr2m0jl118pvk9mtu/api/v1
+    url: http://prometheus:9090
     isDefault: true
-    editable: true
+    editable: false
     jsonData:
       httpMethod: POST
-      timeInterval: 15s
-      httpHeaderName1: Authorization
-    secureJsonData:
-      httpHeaderValue1: ${PROMETHEUS_API_KEY}
+      timeInterval: 10s
     version: 1
-    uid: prometheus-workspace
+    uid: prometheus-local
