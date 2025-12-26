@@ -720,7 +720,24 @@ async def enqueue_analyze_set(file_path: str, user_id: int) -> str:
 
 
 async def enqueue_download_and_analyze(url: str, user_id: int) -> str:
-    """Enqueue download and analyze task. Returns job ID."""
+    """
+    Enqueue download and analyze task with idempotent job_id.
+
+    Same URL → same job_id → idempotent enqueuing (deduplication).
+
+    Returns job ID (deterministic hash of URL).
+    """
+    import hashlib
+
+    # Generate deterministic job_id from URL (ensures idempotency)
+    url_hash = hashlib.md5(url.encode()).hexdigest()
+    job_id = f"url-{url_hash}"
+
     pool = await get_redis_pool()
-    job = await pool.enqueue_job("download_and_analyze_task", url, user_id)
+    job = await pool.enqueue_job(
+        "download_and_analyze_task",
+        url,
+        user_id,
+        _job_id=job_id,  # Force deterministic job_id for deduplication
+    )
     return job.job_id

@@ -26,6 +26,12 @@ import scipy.fft
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
 
+# Import metrics at module level to avoid NameError in finally block
+try:
+    from app.core.monitoring.metrics import stft_computation_seconds
+except ImportError:
+    stft_computation_seconds = None
+
 
 # ============== Pure Numpy Helper Functions ==============
 
@@ -977,7 +983,6 @@ def compute_stft(
     """
     start_time = time.time()
     try:
-        from app.core.monitoring.metrics import stft_computation_seconds
         # Ensure contiguous array for Apple Accelerate
         y = np.ascontiguousarray(y, dtype=np.float32)
 
@@ -1012,7 +1017,8 @@ def compute_stft(
         return cache
     finally:
         duration = time.time() - start_time
-        stft_computation_seconds.labels(sample_rate=str(sr)).observe(duration)
+        if stft_computation_seconds is not None:
+            stft_computation_seconds.labels(sample_rate=str(sr)).observe(duration)
 
 
 def stft_to_mel(
