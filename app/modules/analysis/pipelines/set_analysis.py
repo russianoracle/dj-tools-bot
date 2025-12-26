@@ -741,6 +741,102 @@ class SetAnalysisPipeline(Pipeline):
 
         super().__init__(stages, name="SetAnalysis", on_stage_complete=on_stage_complete)
 
+        # Cache repository for idempotent analysis
+        self.cache_repo = CacheRepository.get_instance()
+
+    def _check_cache(self, abs_path: str) -> Optional[SetAnalysisResult]:
+        """Check if analysis result is cached."""
+        cached_data = self.cache_repo.get_set(abs_path)
+        if cached_data is None:
+            return None
+
+        # Reconstruct result from cache
+        try:
+            return self._result_from_dict(cached_data)
+        except Exception as e:
+            logger.warning("Failed to load from cache", data={
+                "error": str(e),
+                "correlation_id": get_correlation_id(),
+            })
+            return None
+
+    def _save_to_cache(self, abs_path: str, result: SetAnalysisResult):
+        """Save analysis result to cache."""
+        try:
+            self.cache_repo.save_set(abs_path, result.to_dict())
+            logger.debug("Saved to cache", data={
+                "file": Path(abs_path).name,
+                "correlation_id": get_correlation_id(),
+                "job_id": get_job_id(),
+            })
+        except Exception as e:
+            logger.warning("Failed to save to cache", data={
+                "error": str(e),
+                "correlation_id": get_correlation_id(),
+            })
+
+    def _result_from_dict(self, data: Dict) -> SetAnalysisResult:
+        """Reconstruct SetAnalysisResult from cached dict."""
+        # Reconstruct segments
+        raw_segments = data.get('segments', [])
+        segments = []
+        for s in raw_segments:
+            genre = None
+            if s.get('genre'):
+                genre = SegmentGenre(
+                    genre=s['genre'].get('genre', ''),
+                    subgenre=s['genre'].get('subgenre', ''),
+                    dj_category=s['genre'].get('dj_category', ''),
+                    confidence=s['genre'].get('confidence', 0.0),
+                    all_styles=s['genre'].get('all_styles', []),
+                    mood_tags=s['genre'].get('mood_tags', []),
+                )
+            segments.append(SegmentInfo(
+                start_time=s['start_time'],
+                end_time=s['end_time'],
+                duration=s['duration'],
+                segment_index=s['segment_index'],
+                zone=s.get('zone'),
+                features=s.get('features'),
+                genre=genre,
+                is_transition_zone=s.get('is_transition_zone', False),
+            ))
+
+        # Reconstruct genre_distribution
+        genre_dist = None
+        gd = data.get('genre_distribution')
+        if gd:
+            genre_dist = SetGenreDistribution(
+                primary_category=gd.get('primary_category', ''),
+                primary_category_ratio=gd.get('primary_category_ratio', 0.0),
+                category_distribution=gd.get('category_distribution', {}),
+                top_subgenres=gd.get('top_subgenres', []),
+                genre_diversity=gd.get('genre_diversity', 0.0),
+                n_unique_subgenres=gd.get('n_unique_subgenres', 0),
+                genre_flow=gd.get('genre_flow', []),
+                genre_transitions=gd.get('genre_transitions', 0),
+                mood_tags=gd.get('mood_tags', {}),
+            )
+
+        return SetAnalysisResult(
+            file_path=data['file_path'],
+            file_name=data['file_name'],
+            duration_sec=data['duration_sec'],
+            n_transitions=data['n_transitions'],
+            transition_times=data['transition_times'],
+            transition_density=data['transition_density'],
+            n_segments=data['n_segments'],
+            segments=segments,
+            total_drops=data['total_drops'],
+            drop_density=data['drop_density'],
+            energy_timeline=data.get('energy_timeline'),
+            genre_distribution=genre_dist,
+            processing_time_sec=data.get('processing_time_sec', 0.0),
+            peak_memory_mb=data.get('peak_memory_mb', 0.0),
+            success=data.get('success', True),
+            error=data.get('error'),
+        )
+
     def _verbose_stage_callback(self, stage_name: str, context: PipelineContext):
         """Print stage completion with timing and details."""
         elapsed = context.results.get(f'_stage_{stage_name}_time', 0.0)
@@ -765,16 +861,29 @@ class SetAnalysisPipeline(Pipeline):
 
         logger.info("Stage completed", data={"elapsed_sec": f"{elapsed:.1f}", "description": description, "details": details})
 
-    def analyze(self, path: str) -> SetAnalysisResult:
+    def analyze(self, path: str, force: bool = False) -> SetAnalysisResult:
         """
-        Analyze a DJ set.
+        Analyze a DJ set with automatic caching.
 
         Args:
             path: Path to audio file
+            force: Skip cache and re-analyze (default: False)
 
         Returns:
             SetAnalysisResult with all analysis data
         """
+        # Check cache first (idempotent analysis)
+        if not force:
+            abs_path = os.path.abspath(path)
+            cached = self._check_cache(abs_path)
+            if cached is not None:
+                logger.info("Set loaded from cache", data={
+                    "file": Path(path).name,
+                    "correlation_id": get_correlation_id(),
+                    "job_id": get_job_id(),
+                })
+                return cached
+
         context = PipelineContext(input_path=path)
 
         try:
@@ -785,7 +894,7 @@ class SetAnalysisPipeline(Pipeline):
             drops = context.get_result('drops')
             genre_dist = context.get_result('genre_distribution')
 
-            return SetAnalysisResult(
+            result = SetAnalysisResult(
                 file_path=path,
                 file_name=Path(path).name,
                 duration_sec=context.results.get('_duration', 0.0),
@@ -802,6 +911,13 @@ class SetAnalysisPipeline(Pipeline):
                 peak_memory_mb=context.results.get('_peak_memory_mb', 0.0),
                 success=True
             )
+
+            # Save to cache after successful analysis
+            if not force:
+                abs_path = os.path.abspath(path)
+                self._save_to_cache(abs_path, result)
+
+            return result
         except Exception as e:
             return SetAnalysisResult(
                 file_path=path,
